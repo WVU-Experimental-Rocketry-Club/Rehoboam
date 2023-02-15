@@ -5,5 +5,5 @@
     "short": "WVUER and ARC server commands",
     "tags": ["WVU"],
     "requirements": ["gspread","requests","oauth2client","pytz"],
-    "type": "COG",
+    "type": "COG"
 }

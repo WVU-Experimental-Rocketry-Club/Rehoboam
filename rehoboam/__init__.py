@@ -1,4 +1,4 @@
-from rehoboam import Rehoboam_Cog
+from rehoboam import Rehoboam
 
 def setup(bot):
-    bot.add_cog(Rehoboam_Cog(bot))
+    bot.add_cog(Rehoboam(bot))

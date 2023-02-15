@@ -14,7 +14,7 @@ from oauth2client.service_account import ServiceAccountCredentials
 from redbot.core import checks, commands, Config
 from typing import Union
 
-class Rehoboam_Cog(commands.Cog):
+class Rehoboam(commands.Cog):
     """Migrates Rocketry Bot functions to Red cog"""
 
     async def red_delete_data_for_user(self, **kwargs):
