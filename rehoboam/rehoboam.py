@@ -7,8 +7,9 @@ import pytz
 import re
 import requests
 import time
+import calendar
 
-from datetime import datetime
+from datetime import datetime, date
 from discord.ext import tasks
 from oauth2client.service_account import ServiceAccountCredentials
 from redbot.core import checks, commands, Config
@@ -50,126 +51,6 @@ class Rehoboam(commands.Cog):
 
         self.config.register_guild(**default_guild)
         self._ready: asyncio.Event = asyncio.Event()
-
-    # async def sheets_loop(
-    #         self, ctx
-    # ):
-        # g_id = await self.config.guild(ctx.guild).guild_id()
-        # if g_id is None:
-        #     await self.config.guild(ctx.guild).guild_id.set(ctx.guild.id)
-        #     return
-        #
-        # admin_id = await self.config.guild(ctx.guild).admin_channel()
-        # if admin_id is None:
-        #     return
-        #
-        # adminchannel = ctx.guild.get_channel(admin_id)
-        #
-        # global counter
-        # counter = 0
-        # global time_lastupdate
-        # time_lastupdate = None
-        # if counter is not None:
-        #     # Google Sheets Integration
-        #     scope = ["https://spreadsheets.google.com/feeds",
-        #              "https://www.googleapis.com/auth/spreadsheets",
-        #              "https://www.googleapis.com/auth/drive.file",
-        #              "https://www.googleapis.com/auth/drive"]
-        #
-        #     dues_json = await self.config.guild(ctx.guild).server_json()
-        #     if dues_json is None:
-        #         await adminchannel.send("""
-        #         `Google Sheets JSON is not set. Use 'serverjson' command to set file location.`
-        #         """)
-        #         return
-        #
-        #     app_json = open(f'{dues_json}')
-        #     app_creds_dictionary = json.load(app_json)
-        #
-        #     dues_range_open = await self.config.guild(ctx.guild).dues_cells_open()
-        #     dues_range_close = await self.config.guild(ctx.guild).dues_cells_close()
-        #     emails_range_open = await self.config.guild(ctx.guild).emails_cells_open()
-        #     emails_range_close = await self.config.guild(ctx.guild).emails_cells_close()
-        #
-        #     if dues_range_open is None:
-        #         await adminchannel.send("""
-        #         `Google Sheets dues cell range is has no left bound. Use 'duesrange' to set the bounds.`
-        #         """)
-        #         return
-        #     if dues_range_close is None:
-        #         await adminchannel.send("""
-        #         `Google Sheets dues cell range is has no right bound. Use 'duesrange' to set the bounds.`
-        #         """)
-        #         return
-        #     if emails_range_open is None:
-        #         await adminchannel.send("""
-        #         `Google Sheets emails cell range is has no left bound. Use 'emailsrange' to set the bounds.`
-        #         """)
-        #         return
-        #     if emails_range_close is None:
-        #         await adminchannel.send("""
-        #         `Google Sheets emails cell range is has no right bound. Use 'emailsrange' to set the bounds.`
-        #         """)
-        #         return
-        #
-        #     sheet_name = await self.config.guild(ctx.guild).sh_name()
-        #     worksheet_name = await self.config.guild(ctx.guild).wks_name()
-        #
-        #     if sheet_name is None:
-        #         await adminchannel.send("""
-        #         `Google Sheets sheet name is not set. Use 'sh' to set the sheet name.`
-        #         """)
-        #         return
-        #     if worksheet_name is None:
-        #         await adminchannel.send("""
-        #         `Google Sheets worksheet name is not set. Use 'wks' to set the sheet name`
-        #         """)
-        #         return
-        #
-        #     credentials = ServiceAccountCredentials.from_json_keyfile_dict(app_creds_dictionary, scope)
-        #     sa = gspread.authorize(credentials)
-        #     sh = sa.open(f"{sheet_name}")
-        #     wks = sh.worksheet(f"{worksheet_name}")
-        #
-        #     # Retrieve New Data After Time Interval
-        #     # loop_frequency = await self.config.guild(ctx.guild).sheet_loop_freq()
-        #     # lastupdate = await self.config.guild(ctx.guild).time_lastupdate()
-        #     # time_now = time.time()
-        #     # time_difference = (time_now - lastupdate)
-        #     # await adminchannel.send(f'now: {time_now}\nlastupdate: {lastupdate}\ndiff: {time_difference}')
-        #
-        #     # if counter is not None and time_difference > loop_frequency:
-        #     if counter is not None:
-        #         global emailsListFlat
-        #         global duesListFlat
-        #         global emailsList
-        #
-        #         # Create Flat List from Sheets Emails
-        #         emailsList = wks.get(f'{emails_range_open}:{emails_range_close}')
-        #         emailsListFlatInit = list(itertools.chain(*emailsList))
-        #         emailsListFlat = [x.lower() for x in emailsListFlatInit]
-        #
-        #         # Create Flat List from Sheets Dues
-        #         duesList = wks.get(f'{dues_range_open}:{dues_range_close}')
-        #         duesListFlatInit = list(itertools.chain(*duesList))
-        #         duesListFlat = [x.lower() for x in duesListFlatInit]
-        #
-        #         # Print Sheets Loop Info to Console
-        #         # print(time.strftime(f"Sheets data last updated %-I:%M:%S %p.\nLoop {counter}\n", time.localtime()))
-        #         counter = counter + 1
-        #         # await adminchannel.send(
-        #         #     time.strftime(f"""
-        #         # `Sheets data last updated %-I:%M:%S %p.\nLoop {counter}\n`
-        #         # """)
-        #         # )
-        #         await adminchannel.send(
-        #             time.strftime(f"""
-        #         `Sheets data successfully retrieved at %-I:%M:%S %p.\nFetch {counter}\n`
-        #         """)
-        #         )
-        #         await self.config.guild(ctx.guild).sheet_update_count.set(counter)
-        #         await self.config.guild(ctx.guild).time_lastupdate.set(time.time())
-        #         return
 
     @commands.group(autohelp=True)
     @commands.guild_only()
@@ -671,8 +552,21 @@ class Rehoboam(commands.Cog):
                             value_input_option='USER_ENTERED')
 
                         # DM Verified User
+                        今天 = date.today().replace(year=1)
+                        今年 = date.today().year
+                        元旦 = date(year=1, month=1, day=1)
+                        年中 = date(year=1, month=8, day=1)
+                        除夕 = date(year=1, month=12, day=31)
+
+                        if 元旦<=今天<年中:
+                            學年 = f"{今年-1}-{今年} "
+                        elif 年中<=今天<=除夕:
+                            學年 = f"{今年}-{今年+1} "
+                        else:
+                            學年 = f"\u2060"
+
                         await ctx.author.send(
-                            f'Thank you for verifying your dues in the {ctx.guild.name} server!'
+                            f'Thank you for verifying your {學年}dues in the {ctx.guild.name} server!'
                         )
 
                         # Log to Verification Log
@@ -689,7 +583,7 @@ class Rehoboam(commands.Cog):
                     # Unpaid Dues but Somehow Verified
                     elif duesListFlat[rowIndex] == 'false' and verifiedCell == 'TRUE':
                         wks.batch_update([{
-                            'range': f'N{emailIndex}',
+                            'range': f'{join_col}{emailIndex}',
                             'values': [['FALSE']],
                         }],
                             value_input_option='USER_ENTERED')
@@ -699,7 +593,6 @@ class Rehoboam(commands.Cog):
                             if str(role) != 'Member':
                                 return
                             elif str(role) == 'Member':
-                                print('found')
                                 # Remove 'Member' Role
                                 roleM = discord.utils.get(ctx.guild.roles, name=roleMember)
                                 await ctx.author.remove_roles(roleM)
