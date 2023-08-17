@@ -8,12 +8,17 @@ import re
 import requests
 import time
 import calendar
+import os
+import logging
 
-from datetime import datetime, date
+from datetime import datetime, date, timezone, timedelta
 from discord.ext import tasks
 from oauth2client.service_account import ServiceAccountCredentials
 from redbot.core import checks, commands, Config
 from typing import Union
+from .dataIO import dataIO
+
+logger = logging.getLogger("red.rehoboam")
 
 class Rehoboam(commands.Cog):
     """Migrates Rocketry Bot functions to Red cog"""
@@ -26,6 +31,8 @@ class Rehoboam(commands.Cog):
         self.bot = bot
         self.replychannel = None
         self.config = Config.get_conf(self, 9738629561, force_registration=True)
+        self.events = dataIO.load_json("data/scheduled_events/scheduled_events.json")
+        self.check_events.start()
 
         default_guild = {
             "guild_id": None,
@@ -72,7 +79,6 @@ class Rehoboam(commands.Cog):
     async def adminset_clear_channel(self, ctx):
         """Unsets the channel for admin commands."""
         await self.config.guild(ctx.guild).admin_channel.clear()
-        await ctx.tick()
         await ctx.send(
             "The admin command channel has been cleared"
         )
@@ -94,7 +100,6 @@ class Rehoboam(commands.Cog):
     async def duesset_clear_channel(self, ctx):
         """Unsets the channel for dues verification commands. Disables dues verification."""
         await self.config.guild(ctx.guild).dues_channel.clear()
-        await ctx.tick()
         await ctx.send(
             "The dues verification channel has been cleared. Dues verification is now disabled."
         )
@@ -112,7 +117,6 @@ class Rehoboam(commands.Cog):
     async def logset_clear_channel(self, ctx):
         """Unsets the channel where the bot sends dues log info. This will disable logging."""
         await self.config.guild(ctx.guild).dues_log_channel.clear()
-        await ctx.tick()
         await ctx.send(
             "The dues log channel has been cleared. Logging is now disabled."
         )
@@ -130,7 +134,6 @@ class Rehoboam(commands.Cog):
     async def eventsset_clear_channel(self, ctx):
         """Unsets the channel where the bot posts scheduled events. This will disable scheduled event messages."""
         await self.config.guild(ctx.guild).events_channel.clear()
-        await ctx.tick()
         await ctx.send(
             "The events channel has been cleared. Automated scheduled events posts are now disabled."
         )
@@ -152,7 +155,6 @@ class Rehoboam(commands.Cog):
     async def jsonset_clear(self, ctx):
         """Unsets the Google Sheets JSON file. This will disable dues verification."""
         await self.config.guild(ctx.guild).server_json.clear()
-        await ctx.tick()
         await ctx.send(
             "The service account json has been cleared. Dues verification is now disabled."
         )
@@ -169,7 +171,6 @@ class Rehoboam(commands.Cog):
         """Unsets the Google Sheets cell range that contains club dues info. This will disable dues verification."""
         await self.config.guild(ctx.guild).dues_cells_open.clear()
         await self.config.guild(ctx.guild).dues_cells_close.clear()
-        await ctx.tick()
         await ctx.send(
             "The dues range has been cleared. Dues verification is now disabled."
         )
@@ -186,7 +187,6 @@ class Rehoboam(commands.Cog):
         """Unsets the Google Sheets cell range that contains club emails info. This will disable dues verification."""
         await self.config.guild(ctx.guild).emails_cells_open.clear()
         await self.config.guild(ctx.guild).emails_cells_close.clear()
-        await ctx.tick()
         await ctx.send(
             "The emails range has been cleared. Dues verification is now disabled."
         )
@@ -201,7 +201,6 @@ class Rehoboam(commands.Cog):
     async def vercolset_clear(self, ctx):
         """Unsets the Google Sheets column that contains user verified info as TRUE/FALSE."""
         await self.config.guild(ctx.guild).verified_column.clear()
-        await ctx.tick()
         await ctx.send(
             "The user verified column has been cleared."
         )
@@ -216,7 +215,6 @@ class Rehoboam(commands.Cog):
     async def joincolset_clear(self, ctx):
         """Unsets the Google Sheets column that contains user joined Discord info as TRUE/FALSE."""
         await self.config.guild(ctx.guild).joined_column.clear()
-        await ctx.tick()
         await ctx.send(
             "The user joined Discord column has been cleared."
         )
@@ -231,7 +229,6 @@ class Rehoboam(commands.Cog):
     async def nickcolset_clear(self, ctx):
         """Unsets the Google Sheets column that contains server nicknames."""
         await self.config.guild(ctx.guild).nickname_column.clear()
-        await ctx.tick()
         await ctx.send(
             "The nickname column has been cleared."
         )
@@ -246,7 +243,6 @@ class Rehoboam(commands.Cog):
     async def namecolset_clear(self, ctx):
         """Unsets the Google Sheets column that contains usernames."""
         await self.config.guild(ctx.guild).username_column.clear()
-        await ctx.tick()
         await ctx.send(
             "The username column has been cleared."
         )
@@ -264,7 +260,6 @@ class Rehoboam(commands.Cog):
     async def sheet_clear(self, ctx):
         """Unsets the Google Sheets sheet name. This will disable dues verification."""
         await self.config.guild(ctx.guild).sh_name.clear()
-        await ctx.tick()
         await ctx.send(
             "The sheet name has been cleared. Dues verification is now disabled."
         )
@@ -282,7 +277,6 @@ class Rehoboam(commands.Cog):
     async def worksheet_clear(self, ctx):
         """Unsets the Google Sheets worksheet name. This will disable dues verification."""
         await self.config.guild(ctx.guild).wks_name.clear()
-        await ctx.tick()
         await ctx.send(
             "The worksheet name has been cleared. Dues verification is now disabled."
         )
@@ -307,7 +301,6 @@ class Rehoboam(commands.Cog):
             )
         else:
             await self.config.guild(ctx.guild).sheet_loop_freq.set(frequency)
-            await ctx.tick()
             await ctx.send(
                 f"Sheets data retrieval time interval set to {interval_format}."
             )
@@ -318,7 +311,6 @@ class Rehoboam(commands.Cog):
         Reset Google Sheets data loop frequency to default of 3600 seconds.
         """
         await self.config.guild(ctx.guild).sheet_loop_freq.clear()
-        await ctx.tick()
         await ctx.send(
             f"Sheets data retrieval time set to 01:00:00."
         )
@@ -631,3 +623,63 @@ class Rehoboam(commands.Cog):
             await ctx.send(
                 'This does not appear to be a valid email. Please check your message for formatting/spelling errors.'
             )
+
+    @commands.Cog.listener()
+    async def on_scheduled_event_create(self, ctx):
+        events_id = await self.config.guild(ctx.guild).events_channel()
+        if events_id is not None:
+            eventschannel = ctx.guild.get_channel(events_id)
+            event_url = ctx.url
+            event_start = ctx.start_time.isoformat()
+
+            self.events.append({"GUILD": ctx.guild.id,"ID": ctx.id, "START": event_start})
+
+            logger.info("New scheduled event ({}) created in {}.".format(ctx.id, ctx.guild.name))
+            dataIO.save_json("data/scheduled_events/scheduled_events.json", self.events)
+
+            await eventschannel.send(event_url)
+
+        else:
+            return
+
+    @tasks.loop(seconds=5)
+    async def check_events(self):
+        to_remove = []
+        for event in self.events:
+            guild = self.bot.get_guild(event["GUILD"])
+            scheduled_event_id = event["ID"]
+            event_start = event["START"]
+            events_id = await self.config.guild(guild).events_channel()
+            eventschannel = guild.get_channel(events_id)
+            scheduled_event = guild.get_scheduled_event(scheduled_event_id)
+
+            if (datetime.now(timezone.utc) - timedelta(seconds=10)) <= (datetime.fromisoformat(event_start) - timedelta(hours=1)) <= (datetime.now(timezone.utc) + timedelta(seconds=10)):
+                try:
+                    await eventschannel.send(f"{scheduled_event.url}\nEvent starts in 1 hour.")
+                except (discord.errors.Forbidden, discord.errors.NotFound):
+                    to_remove.append(event)
+                except discord.errors.HTTPException:
+                    pass
+                else:
+                    to_remove.append(event)
+            if (datetime.fromisoformat(event_start) - timedelta(hours=1)) <= (datetime.now(timezone.utc) - timedelta(seconds=10)):
+                to_remove.append(event)
+        for event in to_remove:
+            self.events.remove(event)
+        if to_remove:
+            dataIO.save_json("data/scheduled_events/scheduled_events.json", self.events)
+
+    @check_events.before_loop
+    async def before_task(self):
+        await self.bot.wait_until_ready()
+
+def check_folders():
+    if not os.path.exists("data/scheduled_events"):
+        print("Creating data/scheduled_events folder...")
+        os.makedirs("data/scheduled_events")
+
+def check_files():
+    f = "data/scheduled_events/scheduled_events.json"
+    if not dataIO.is_valid_json(f):
+        print("Creating empty scheduled_events.json...")
+        dataIO.save_json(f, [])

@@ -1,4 +1,8 @@
-from .rehoboam import Rehoboam
+import asyncio
+from .rehoboam import Rehoboam, check_folders, check_files
 
-def setup(bot):
-    bot.add_cog(Rehoboam(bot))
+async def setup(bot):
+    check_folders()
+    check_files()
+
+    await bot.add_cog(Rehoboam(bot))

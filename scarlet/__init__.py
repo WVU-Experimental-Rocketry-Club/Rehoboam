@@ -1,4 +1,4 @@
 from .scarlet import Scarlet
 
-def setup(bot):
-    bot.add_cog(Scarlet(bot))
+async def setup(bot):
+    await bot.add_cog(Scarlet(bot))
