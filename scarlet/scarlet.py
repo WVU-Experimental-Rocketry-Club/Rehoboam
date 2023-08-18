@@ -52,8 +52,8 @@ class Scarlet(commands.Cog):
                 # await news_links_channel.send(ctx.embeds)
                 for embed in ctx.embeds:
                     # await news_links_channel.send(embed.url)
-                    if any(re.search(re.escape(site), embed.url, re.IGNORECASE) is not None for site in whitelist):
-                        if any(re.search(re.escape(site), embed.url, re.IGNORECASE) is not None for site in blacklist):
+                    if any(re.search(fr'^(https://)?([a-z]+\.)*({re.escape(site)})', embed.url, re.IGNORECASE) is not None for site in whitelist):
+                        if any(re.search(fr'^(https://)?([a-z]+\.)*({re.escape(site)})', embed.url, re.IGNORECASE) is not None for site in blacklist):
                             return
                         else:
                             await news_links_channel.send(embed.url)

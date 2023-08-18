@@ -500,6 +500,7 @@ class Rehoboam(commands.Cog):
                 # Print Sheets Data Retrieval Info to Channel
                 counter = counter + 1
                 try:
+                    # If OS is MacOS
                     await adminchannel.send(
                         time.strftime(f"""
                         `Sheets data successfully retrieved at %-I:%M:%S %p.\nFetch {counter}\n`
