@@ -3,6 +3,6 @@
     "description": "News link shit for the Scarlet server",
     "install_msg": "have a blast",
     "short": "Scarlet news links",
-    "requirements": []
+    "requirements": [],
     "type": "COG"
 }

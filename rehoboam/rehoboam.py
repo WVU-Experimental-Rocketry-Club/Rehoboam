@@ -499,11 +499,19 @@ class Rehoboam(commands.Cog):
 
                 # Print Sheets Data Retrieval Info to Channel
                 counter = counter + 1
-                await adminchannel.send(
-                    time.strftime(f"""
-                `Sheets data successfully retrieved at %-I:%M:%S %p.\nFetch {counter}\n`
-                """)
-                )
+                try:
+                    await adminchannel.send(
+                        time.strftime(f"""
+                        `Sheets data successfully retrieved at %-I:%M:%S %p.\nFetch {counter}\n`
+                        """)
+                    )
+                except ValueError:
+                    # If OS is Windows
+                    await adminchannel.send(
+                        time.strftime(f"""
+                                    `Sheets data successfully retrieved at %#I:%M:%S %p.\nFetch {counter}\n`
+                                    """)
+                    )
                 await self.config.guild(ctx.guild).sheet_update_count.set(counter)
                 await self.config.guild(ctx.guild).time_lastupdate.set(time.time())
 
