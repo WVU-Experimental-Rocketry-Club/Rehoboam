@@ -47,6 +47,8 @@ class Rehoboam(commands.Cog):
             "dues_cells_close": None,
             "emails_cells_open": None,
             "emails_cells_close": None,
+            "alum_cells_open": None,
+            "alum_cells_close": None,
             "verified_column": None,
             "joined_column": None,
             "nickname_column": None,
@@ -63,13 +65,18 @@ class Rehoboam(commands.Cog):
     @commands.guild_only()
     @checks.admin_or_permissions(manage_guild=True)
     async def serverconfig(self, ctx):
-        """Config commands for server functions"""
+        """
+        Config commands for server functions
+        """
         pass
 
     @serverconfig.command(name="adminchannel")
     async def adminset_channel(
             self, ctx, *, channel: Union[discord.TextChannel, discord.VoiceChannel]):
-        """Changes the channel where the bot will accept admin commands."""
+        """
+        Changes the channel from which the bot will accept admin commands
+        `<channel>` the channel to be used
+        """
         await self.config.guild(ctx.guild).admin_channel.set(channel.id)
         await ctx.send(
             ("The admin channel has been set to {channel.mention}").format(channel=channel)
@@ -77,7 +84,9 @@ class Rehoboam(commands.Cog):
 
     @serverconfig.command(name="clearadminchannel")
     async def adminset_clear_channel(self, ctx):
-        """Unsets the channel for admin commands."""
+        """
+        Clears the channel for admin commands
+        """
         await self.config.guild(ctx.guild).admin_channel.clear()
         await ctx.send(
             "The admin command channel has been cleared"
@@ -86,7 +95,10 @@ class Rehoboam(commands.Cog):
     @serverconfig.command(name="dueschannel")
     async def duesset_channel(
             self, ctx, *, channel: Union[discord.TextChannel, discord.VoiceChannel]):
-        """Changes the channel where the bot will accept dues verification commands."""
+        """
+        Changes the channel where the bot will accept dues verification commands
+        `<channel>` the channel to be used
+        """
         guild = await self.config.guild(ctx.guild).guild_id()
         if guild is None:
             await self.config.guild(ctx.guild).guild_id.set(ctx.guild.id)
@@ -98,7 +110,9 @@ class Rehoboam(commands.Cog):
 
     @serverconfig.command(name="cleardueschannel")
     async def duesset_clear_channel(self, ctx):
-        """Unsets the channel for dues verification commands. Disables dues verification."""
+        """
+        Unsets the channel for dues verification commands. Disables dues verification
+        """
         await self.config.guild(ctx.guild).dues_channel.clear()
         await ctx.send(
             "The dues verification channel has been cleared. Dues verification is now disabled."
@@ -107,7 +121,10 @@ class Rehoboam(commands.Cog):
     @serverconfig.command(name="logchannel")
     async def logset_channel(
             self, ctx, *, channel: Union[discord.TextChannel, discord.VoiceChannel]):
-        """Changes the channel where the bot will send dues log info."""
+        """
+        Changes the channel where the bot will send dues log info
+        `<channel>` the channel to be used
+        """
         await self.config.guild(ctx.guild).dues_log_channel.set(channel.id)
         await ctx.send(
             ("The dues log channel has been set to {channel.mention}").format(channel=channel)
@@ -115,7 +132,9 @@ class Rehoboam(commands.Cog):
 
     @serverconfig.command(name="clearlogchannel")
     async def logset_clear_channel(self, ctx):
-        """Unsets the channel where the bot sends dues log info. This will disable logging."""
+        """
+        Unsets the channel where the bot sends dues log info. This will disable logging
+        """
         await self.config.guild(ctx.guild).dues_log_channel.clear()
         await ctx.send(
             "The dues log channel has been cleared. Logging is now disabled."
@@ -124,7 +143,10 @@ class Rehoboam(commands.Cog):
     @serverconfig.command(name="eventschannel")
     async def eventsset_channel(
             self, ctx, *, channel: Union[discord.TextChannel, discord.VoiceChannel]):
-        """Changes the channel where the bot posts scheduled events."""
+        """
+        Changes the channel where the bot posts scheduled events
+        `<channel>` the channel to be used
+        """
         await self.config.guild(ctx.guild).events_channel.set(channel.id)
         await ctx.send(
             ("The events channel has been set to {channel.mention}").format(channel=channel)
@@ -132,7 +154,9 @@ class Rehoboam(commands.Cog):
 
     @serverconfig.command(name="cleareventschannel")
     async def eventsset_clear_channel(self, ctx):
-        """Unsets the channel where the bot posts scheduled events. This will disable scheduled event messages."""
+        """
+        Unsets the channel where the bot posts scheduled events. This will disable scheduled event messages
+        """
         await self.config.guild(ctx.guild).events_channel.clear()
         await ctx.send(
             "The events channel has been cleared. Automated scheduled events posts are now disabled."
@@ -142,18 +166,25 @@ class Rehoboam(commands.Cog):
     @commands.guild_only()
     @checks.admin_or_permissions(manage_guild=True)
     async def sheetsconfig(self, ctx):
-        """Config commands for Google Sheets integration."""
+        """
+        Config commands for Google Sheets integration
+        """
         pass
 
     @sheetsconfig.command(name="serverjson")
-    async def jsonset(self, ctx, json: str):
-        """Sets the Google Sheets JSON file that contains the service account credentials."""
-        await self.config.guild(ctx.guild).server_json.set(json)
-        await ctx.send(f"The service account json has been set to {json}")
+    async def jsonset(self, ctx, path: str):
+        """
+        Sets the Google Sheets JSON file that contains the service account credentials
+        `<path>` the full path to the JSON file
+        """
+        await self.config.guild(ctx.guild).server_json.set(path)
+        await ctx.send(f"The service account json has been set to {path}")
 
     @sheetsconfig.command(name="clearserverjson")
     async def jsonset_clear(self, ctx):
-        """Unsets the Google Sheets JSON file. This will disable dues verification."""
+        """
+        Unsets the Google Sheets JSON file. This will disable dues verification
+        """
         await self.config.guild(ctx.guild).server_json.clear()
         await ctx.send(
             "The service account json has been cleared. Dues verification is now disabled."
@@ -161,14 +192,20 @@ class Rehoboam(commands.Cog):
 
     @sheetsconfig.command(name="duesrange")
     async def duesrangeset(self, ctx, range_open: str, range_close: str):
-        """Sets the Google Sheets cell range that contains club dues info as TRUE/FALSE."""
+        """
+        Sets the Google Sheets cell range that contains club dues info as TRUE/FALSE
+        `<range_open>` the cell of the start of the range in A1 notation
+        `<range_close>` the cell of the end of the range in A1 notation
+        """
         await self.config.guild(ctx.guild).dues_cells_open.set(range_open)
         await self.config.guild(ctx.guild).dues_cells_close.set(range_close)
         await ctx.send(f"The dues range has been set to {range_open}:{range_close}")
 
     @sheetsconfig.command(name="clearduesrange")
     async def duesrangeset_clear(self, ctx):
-        """Unsets the Google Sheets cell range that contains club dues info. This will disable dues verification."""
+        """
+        Unsets the Google Sheets cell range that contains club dues info. This will disable dues verification
+        """
         await self.config.guild(ctx.guild).dues_cells_open.clear()
         await self.config.guild(ctx.guild).dues_cells_close.clear()
         await ctx.send(
@@ -177,29 +214,62 @@ class Rehoboam(commands.Cog):
 
     @sheetsconfig.command(name="emailsrange")
     async def emailsrangeset(self, ctx, range_open: str, range_close: str):
-        """Sets the Google Sheets cell range that contains club emails info as TRUE/FALSE."""
+        """
+        Sets the Google Sheets cell range that contains club emails info as TRUE/FALSE
+        `<range_open>` the cell of the start of the range in A1 notation
+        `<range_close>` the cell of the end of the range in A1 notation
+        """
         await self.config.guild(ctx.guild).emails_cells_open.set(range_open)
         await self.config.guild(ctx.guild).emails_cells_close.set(range_close)
         await ctx.send(f"The emails range has been set to {range_open}:{range_close}")
 
     @sheetsconfig.command(name="clearemailsrange")
     async def emailsrangeset_clear(self, ctx):
-        """Unsets the Google Sheets cell range that contains club emails info. This will disable dues verification."""
+        """
+        Unsets the Google Sheets cell range that contains club emails info. This will disable dues verification
+        """
         await self.config.guild(ctx.guild).emails_cells_open.clear()
         await self.config.guild(ctx.guild).emails_cells_close.clear()
         await ctx.send(
             "The emails range has been cleared. Dues verification is now disabled."
         )
 
+    @sheetsconfig.command(name="alumrange")
+    async def alumrangeset(self, ctx, range_open: str, range_close: str):
+        """
+        Sets the Google Sheets cell range that contains club alum info as TRUE/FALSE
+        `<range_open>` the cell of the start of the range in A1 notation
+        `<range_close>` the cell of the end of the range in A1 notation
+        """
+        await self.config.guild(ctx.guild).alum_cells_open.set(range_open)
+        await self.config.guild(ctx.guild).alum_cells_close.set(range_close)
+        await ctx.send(f"The alum range has been set to {range_open}:{range_close}")
+
+    @sheetsconfig.command(name="clearalumrange")
+    async def alumrangeset_clear(self, ctx):
+        """
+        Unsets the Google Sheets cell range that contains club alum info. This will disable dues verification
+        """
+        await self.config.guild(ctx.guild).alum_cells_open.clear()
+        await self.config.guild(ctx.guild).alum_cells_close.clear()
+        await ctx.send(
+            "The alum range has been cleared. Dues verification is now disabled."
+        )
+
     @sheetsconfig.command(name="verifiedcolumn")
     async def vercolset(self, ctx, column: str):
-        """Sets the Google Sheets column that contains user verified info as TRUE/FALSE."""
+        """
+        Sets the Google Sheets column that contains user verified info as TRUE/FALSE
+        `<column>` the letter of the column
+        """
         await self.config.guild(ctx.guild).verified_column.set(column)
         await ctx.send(f"The user verified column has been set to {column}")
 
     @sheetsconfig.command(name="clearverifiedcolumn")
     async def vercolset_clear(self, ctx):
-        """Unsets the Google Sheets column that contains user verified info as TRUE/FALSE."""
+        """
+        Unsets the Google Sheets column that contains user verified info as TRUE/FALSE
+        """
         await self.config.guild(ctx.guild).verified_column.clear()
         await ctx.send(
             "The user verified column has been cleared."
@@ -207,13 +277,18 @@ class Rehoboam(commands.Cog):
 
     @sheetsconfig.command(name="joinedcolumn")
     async def joincolset(self, ctx, column: str):
-        """Sets the Google Sheets column that contains user joined Discord info as TRUE/FALSE."""
+        """
+        Sets the Google Sheets column that contains user joined Discord info as TRUE/FALSE
+        `<column>` the letter of the column
+        """
         await self.config.guild(ctx.guild).joined_column.set(column)
         await ctx.send(f"The user joined Discord column has been set to {column}")
 
     @sheetsconfig.command(name="clearjoinedcolumn")
     async def joincolset_clear(self, ctx):
-        """Unsets the Google Sheets column that contains user joined Discord info as TRUE/FALSE."""
+        """
+        Unsets the Google Sheets column that contains user joined Discord info as TRUE/FALSE
+        """
         await self.config.guild(ctx.guild).joined_column.clear()
         await ctx.send(
             "The user joined Discord column has been cleared."
@@ -221,13 +296,18 @@ class Rehoboam(commands.Cog):
 
     @sheetsconfig.command(name="nicknamecolumn")
     async def nickcolset(self, ctx, column: str):
-        """Sets the Google Sheets column that contains server nicknames."""
+        """
+        Sets the Google Sheets column that contains server nicknames
+        `<column>` the letter of the column
+        """
         await self.config.guild(ctx.guild).nickname_column.set(column)
         await ctx.send(f"The nickname column has been set to {column}")
 
     @sheetsconfig.command(name="clearnicknamecolumn")
     async def nickcolset_clear(self, ctx):
-        """Unsets the Google Sheets column that contains server nicknames."""
+        """
+        Unsets the Google Sheets column that contains server nicknames
+        """
         await self.config.guild(ctx.guild).nickname_column.clear()
         await ctx.send(
             "The nickname column has been cleared."
@@ -235,13 +315,18 @@ class Rehoboam(commands.Cog):
 
     @sheetsconfig.command(name="usernamecolumn")
     async def namecolset(self, ctx, column: str):
-        """Sets the Google Sheets column that contains usernames."""
+        """
+        Sets the Google Sheets column that contains usernames
+        `<column>` the letter of the column
+        """
         await self.config.guild(ctx.guild).username_column.set(column)
         await ctx.send(f"The username column has been set to {column}")
 
     @sheetsconfig.command(name="clearusernamecolumn")
     async def namecolset_clear(self, ctx):
-        """Unsets the Google Sheets column that contains usernames."""
+        """
+        Unsets the Google Sheets column that contains usernames
+        """
         await self.config.guild(ctx.guild).username_column.clear()
         await ctx.send(
             "The username column has been cleared."
@@ -251,14 +336,16 @@ class Rehoboam(commands.Cog):
     async def sheetset(self, ctx, sheet: str):
         """
         Sets the Google Sheets sheet name.
-        "[Your Sheet Name]"
+        `<sheet>` the name of the sheet. "[Your Sheet Name]"
         """
         await self.config.guild(ctx.guild).sh_name.set(sheet)
         await ctx.send(f"The sheet name has been set to {sheet}")
 
     @sheetsconfig.command(name="clearsh")
     async def sheet_clear(self, ctx):
-        """Unsets the Google Sheets sheet name. This will disable dues verification."""
+        """
+        Unsets the Google Sheets sheet name. This will disable dues verification.
+        """
         await self.config.guild(ctx.guild).sh_name.clear()
         await ctx.send(
             "The sheet name has been cleared. Dues verification is now disabled."
@@ -268,14 +355,16 @@ class Rehoboam(commands.Cog):
     async def worksheetset(self, ctx, worksheet: str):
         """
         Sets the Google Sheets worksheet name.
-        "[Your Worksheet Name]"
+        `<worksheet>` the name of the worksheet. "[Your Worksheet Name]"
         """
         await self.config.guild(ctx.guild).wks_name.set(worksheet)
         await ctx.send(f"The worksheet name has been set to {worksheet}")
 
     @sheetsconfig.command(name="clearwks")
     async def worksheet_clear(self, ctx):
-        """Unsets the Google Sheets worksheet name. This will disable dues verification."""
+        """
+        Unsets the Google Sheets worksheet name. This will disable dues verification.
+        """
         await self.config.guild(ctx.guild).wks_name.clear()
         await ctx.send(
             "The worksheet name has been cleared. Dues verification is now disabled."
@@ -285,9 +374,9 @@ class Rehoboam(commands.Cog):
     async def sheet_loop_freq_set(self, ctx, hours: int, minutes: int, seconds: int):
         """
         Set Google Sheets data loop frequency.
-        :param hours:
-        :param minutes:
-        :param seconds:
+        `<hours>` number of hours
+        `<minutes>` number of minutes
+        `<seconds>` number of seconds
         """
         hrs_sec = hours * 60 * 60
         mins_sec =  minutes * 60
@@ -308,7 +397,7 @@ class Rehoboam(commands.Cog):
     @sheetsconfig.command(name="clearinterval")
     async def sheet_loop_freq_clear(self, ctx):
         """
-        Reset Google Sheets data loop frequency to default of 3600 seconds.
+        Reset Google Sheets data loop frequency to default of 3600 seconds
         """
         await self.config.guild(ctx.guild).sheet_loop_freq.clear()
         await ctx.send(
@@ -322,11 +411,9 @@ class Rehoboam(commands.Cog):
             self, ctx, target_channelID: discord.TextChannel, target_messageID: int, content: str):
         """
         Admin manual replies to user messages
-        :param ctx:
-        :param target_channelID:
-        :param target_messageID:
-        :param content:
-        :return:
+        `<channel>` Channel containing target message
+        `<message>` ID of target message
+        `<content>` Content of message to send as a reply
         """
         # Check for Valid Channel
         admin_channel = await self.config.guild(ctx.guild).admin_channel()
@@ -371,14 +458,20 @@ class Rehoboam(commands.Cog):
     @commands.command()
     @commands.guild_only()
     async def verify(
-            self, ctx, mix_email: str
+            self, ctx, mix_email: str, alum: str = None
     ):
         """
-        Verify club dues for access to members-only channels.
-        :param ctx:
-        :param mix_email:
-        :return:
+        Verify club dues or alumni status for access to members-only channels.
+        `<mix email>` Your full WVU mix email.
+        `<alum>` If verifying alum status, write "alum". Otherwise, leave blank
         """
+
+      # Check alum str
+        if alum is not None:
+            alum = alum.lower()
+            if alum != "alum":
+                await ctx.send("Invalid argument in command. Please use `[p]help verify` to view command information. ")
+                return
 
       # Google
         scope = ["https://spreadsheets.google.com/feeds",
@@ -395,6 +488,8 @@ class Rehoboam(commands.Cog):
         dues_range_close = await self.config.guild(ctx.guild).dues_cells_close()
         emails_range_open = await self.config.guild(ctx.guild).emails_cells_open()
         emails_range_close = await self.config.guild(ctx.guild).emails_cells_close()
+        alum_range_open = await self.config.guild(ctx.guild).alum_cells_open()
+        alum_range_close = await self.config.guild(ctx.guild).alum_cells_close()
         ver_col = await self.config.guild(ctx.guild).verified_column()
         join_col = await self.config.guild(ctx.guild).joined_column()
         nickname_col = await self.config.guild(ctx.guild).nickname_column()
@@ -411,6 +506,7 @@ class Rehoboam(commands.Cog):
         # Server handling bullshit
         roleMember = 'Member'
         roleUnpaid = 'Unpaid Dues'
+        roleAlum = 'Alum'
 
         g_id = await self.config.guild(ctx.guild).guild_id()
         if g_id is None:
@@ -419,7 +515,7 @@ class Rehoboam(commands.Cog):
         admin_id = await self.config.guild(ctx.guild).admin_channel()
         if admin_id is None:
             await ctx.reply("""
-                        `The channel for admin commands is not set. Use 'adminchannel' command to set the channel. Disregard this message if you are not a server admin`
+                        `The channel for admin commands is not set. Use '[p]adminchannel' command to set the channel. Disregard this message if you are not a server admin`
                         """)
             return
         adminchannel = ctx.guild.get_channel(admin_id)
@@ -432,42 +528,52 @@ class Rehoboam(commands.Cog):
 
         if dues_channel is None:
             await adminchannel.send("""
-            `The channel for dues verification is not set. Use 'dueschannel' command to set the channel`
+            `The channel for dues verification is not set. Use '[p]dueschannel' command to set the channel`
             """)
             return
         if dues_json is None:
             await adminchannel.send("""
-            `Google Sheets JSON is not set. Use 'serverjson' command to set the file location.`
+            `Google Sheets JSON is not set. Use '[p]serverjson' command to set the file location.`
             """)
             return
         if sheet_name is None:
             await adminchannel.send("""
-            `Google Sheets sheet name is not set. Use 'sh' to set the sheet name.`
+            `Google Sheets sheet name is not set. Use '[p]sh' to set the sheet name.`
             """)
             return
         if worksheet_name is None:
             await adminchannel.send("""
-            `Google Sheets worksheet name is not set. Use 'wks' to set the sheet name`
+            `Google Sheets worksheet name is not set. Use '[p]wks' to set the sheet name`
             """)
             return
         if dues_range_open is None:
             await adminchannel.send("""
-            `Google Sheets dues cell range is has no left bound. Use 'duesrange' to set the bounds.`
+            `Google Sheets dues cell range has no left bound. Use '[p]duesrange' to set the bounds.`
             """)
             return
         if dues_range_close is None:
             await adminchannel.send("""
-            `Google Sheets dues cell range is has no right bound. Use 'duesrange' to set the bounds.`
+            `Google Sheets dues cell range has no right bound. Use '[p]duessrange' to set the bounds.`
             """)
             return
         if emails_range_open is None:
             await adminchannel.send("""
-            `Google Sheets emails cell range is has no left bound. Use 'emailsrange' to set the bounds.`
+            `Google Sheets emails cell range has no left bound. Use '[p]emailsrange' to set the bounds.`
             """)
             return
         if emails_range_close is None:
             await adminchannel.send("""
-            `Google Sheets emails cell range is has no right bound. Use 'emailsrange' to set the bounds.`
+            `Google Sheets emails cell range has no right bound. Use '[p]emailsrange' to set the bounds.`
+            """)
+            return
+        if alum_range_open is None:
+            await adminchannel.send("""
+            `Google Sheets alum cell range has no left bound. Use '[p]alumrange' to set the bounds.`
+            """)
+            return
+        if alum_range_close is None:
+            await adminchannel.send("""
+            `Google Sheets alum cell range has no right bound. Use '[p]alumrange' to set the bounds.`
             """)
             return
         if dues_channel != ctx.channel:
@@ -496,6 +602,11 @@ class Rehoboam(commands.Cog):
                 duesList = wks.get(f'{dues_range_open}:{dues_range_close}')
                 duesListFlatInit = list(itertools.chain(*duesList))
                 duesListFlat = [x.lower() for x in duesListFlatInit]
+
+                # Create Flat List from Sheet Alums
+                alumList = wks.get(f'{alum_range_open}:{alum_range_close}')
+                alumListFlatInit = list(itertools.chain(*alumList))
+                alumListFlat = [x.lower() for x in alumListFlatInit]
 
                 # Print Sheets Data Retrieval Info to Channel
                 counter = counter + 1
@@ -536,6 +647,72 @@ class Rehoboam(commands.Cog):
                     else:
                         username_discriminator = f"{username}#{discriminator}"
 
+                    # Check if User is Alumnus
+                    if alum == "alum":
+                        if alumListFlat[rowIndex] == 'true' and verifiedCell == 'FALSE':
+                            # Updates roles
+                            roleA = discord.utils.get(ctx.guild.roles, name=roleAlum)
+                            await ctx.author.add_roles(roleA)
+
+                            roleM = discord.utils.get(ctx.guild.roles, name=roleMember)
+                            roleU = discord.utils.get(ctx.guild.roles, name=roleUnpaid)
+                            await ctx.author.remove_roles(roleM, roleU)
+
+                            # Update 'Joined Discord' and 'Bot Verified' Columns
+                            wks.batch_update([{
+                                'range': f'{join_col}{emailIndex}:{username_col}{emailIndex}',
+                                'values': [['TRUE', 'TRUE', f'{nickname}', f'{username_discriminator}']],
+                            }],
+                                value_input_option='USER_ENTERED')
+
+                            # DM Verified User
+                            今天 = date.today().replace(year=1)
+                            今年 = date.today().year
+                            元旦 = date(year=1, month=1, day=1)
+                            年中 = date(year=1, month=8, day=1)
+                            除夕 = date(year=1, month=12, day=31)
+
+                            if 元旦 <= 今天 < 年中:
+                                學年 = f"{今年 - 1}-{今年} "
+                            elif 年中 <= 今天 <= 除夕:
+                                學年 = f"{今年}-{今年 + 1} "
+                            else:
+                                學年 = f"\u2060"
+
+                            await ctx.author.send(
+                                f'Thank you for verifying in the {ctx.guild.name} server!'
+                            )
+
+                            # Log to Verification Log
+                            await log_channel.send(
+                                f'{ctx.author.mention} has verified alumni status.'
+                            )
+                            return
+
+                        elif alumListFlat[rowIndex] == 'true' and verifiedCell == 'TRUE':
+                            async with ctx.channel.typing():
+                                await asyncio.sleep(.25)
+                            await ctx.send(
+                                'Our records show this email has already been used to verify. Please contact an admin to resolve the issue.'
+                            )
+                            return
+
+                        elif alumListFlat[rowIndex] == 'false' and verifiedCell == 'TRUE':
+                            async with ctx.channel.typing():
+                                await asyncio.sleep(.25)
+                            await ctx.send(
+                                'Our records show this email does not belong to an alumnus. If this is incorrect, please contact an admin to resolve the issue.'
+                            )
+                            return
+
+                        elif alumListFlat[rowIndex] == 'false' and verifiedCell == 'FALSE':
+                            async with ctx.channel.typing():
+                                await asyncio.sleep(.25)
+                            await ctx.send(
+                                'Our records show this email does not belong to an alumnus. If this is incorrect, please contact an admin to resolve the issue.'
+                            )
+                            return
+
                     # Paid Dues Not Verified
                     if duesListFlat[rowIndex] == 'true' and verifiedCell == 'FALSE':
                         # Updates roles
@@ -571,7 +748,10 @@ class Rehoboam(commands.Cog):
                         )
 
                         # Log to Verification Log
-                        await log_channel.send(f'{ctx.author.mention} has verified dues.')
+                        await log_channel.send(
+                            f'{ctx.author.mention} has verified dues.'
+                        )
+                        return
 
                     # Paid Dues Already Verified
                     elif duesListFlat[rowIndex] == 'true' and verifiedCell == 'TRUE':
@@ -580,6 +760,7 @@ class Rehoboam(commands.Cog):
                         await ctx.send(
                             'Our records show this email has already been used to verify dues. If this was not done by you, please contact an admin to resolve the issue.'
                         )
+                        return
 
                     # Unpaid Dues but Somehow Verified
                     elif duesListFlat[rowIndex] == 'false' and verifiedCell == 'TRUE':
@@ -591,9 +772,7 @@ class Rehoboam(commands.Cog):
 
                         # Check if User Has 'Member' Role
                         for role in ctx.author.roles:
-                            if str(role) != 'Member':
-                                return
-                            elif str(role) == 'Member':
+                            if str(role) == 'Member':
                                 # Remove 'Member' Role
                                 roleM = discord.utils.get(ctx.guild.roles, name=roleMember)
                                 await ctx.author.remove_roles(roleM)
@@ -601,8 +780,6 @@ class Rehoboam(commands.Cog):
                                 # Add 'Unpaid Dues' Role
                                 roleU = discord.utils.get(ctx.guild.roles, name=roleUnpaid)
                                 await ctx.author.add_roles(roleU)
-                            else:
-                                return
 
                         # Send Unpaid Dues Message to User
                         async with ctx.channel.typing():
@@ -610,6 +787,7 @@ class Rehoboam(commands.Cog):
                         await ctx.send(
                             'Unable to verify dues. Our records show you have not paid dues. Contact an admin for assistance if you believe this is a mistake.'
                         )
+                        return
 
                     # Send Unpaid Dues Message to User
                     else:
@@ -618,6 +796,7 @@ class Rehoboam(commands.Cog):
                         await ctx.send(
                             'Unable to verify dues. Our records show you have not paid dues. Contact an admin for assistance if you believe this is a mistake.'
                         )
+                        return
 
                 # Send Email Not Found Message to User
                 elif dues_channel == ctx.channel.id:
@@ -626,12 +805,14 @@ class Rehoboam(commands.Cog):
                     await ctx.send(
                         'This email does not appear in our records. Please check your message for formatting/spelling errors. Contact an admin for assistance if the problem persists.'
                     )
+                    return
         else:
             async with ctx.channel.typing():
                 await asyncio.sleep(.25)
             await ctx.send(
                 'This does not appear to be a valid email. Please check your message for formatting/spelling errors.'
             )
+            return
 
     @commands.Cog.listener()
     async def on_scheduled_event_create(self, ctx):
