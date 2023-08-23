@@ -29,7 +29,6 @@ class Rehoboam(commands.Cog):
 
     def __init__(self, bot):
         self.bot = bot
-        self.replychannel = None
         self.config = Config.get_conf(self, 9738629561, force_registration=True)
         self.events = dataIO.load_json("data/scheduled_events/scheduled_events.json")
         self.check_events.start()
@@ -49,13 +48,24 @@ class Rehoboam(commands.Cog):
             "emails_cells_close": None,
             "alum_cells_open": None,
             "alum_cells_close": None,
-            "verified_column": None,
+            "ver_cells_open": None,
+            "ver_cells_close": None,
             "joined_column": None,
             "nickname_column": None,
             "username_column": None,
             "sheet_update_count": 0,
-            "sheet_loop_freq": 3600,
-            "time_lastupdate": 0
+            "sheetupdatefreq": 0,
+            "time_lastupdate": 0,
+            "emailsList": [],
+            "emailsListFlat": [],
+            "duesListFlat": [],
+            "alumListFlat": [],
+            "verListFlat": [],
+            "rowIndex": None,
+            "emailIndex": None,
+            "roleMember": None,
+            "roleUnpaid": None,
+            "roleAlum": None
         }
 
         self.config.register_guild(**default_guild)
@@ -108,16 +118,6 @@ class Rehoboam(commands.Cog):
             ("The dues verification channel has been set to {channel.mention}").format(channel=channel)
         )
 
-    @serverconfig.command(name="cleardueschannel")
-    async def duesset_clear_channel(self, ctx):
-        """
-        Unsets the channel for dues verification commands. Disables dues verification
-        """
-        await self.config.guild(ctx.guild).dues_channel.clear()
-        await ctx.send(
-            "The dues verification channel has been cleared. Dues verification is now disabled."
-        )
-
     @serverconfig.command(name="logchannel")
     async def logset_channel(
             self, ctx, *, channel: Union[discord.TextChannel, discord.VoiceChannel]):
@@ -161,6 +161,35 @@ class Rehoboam(commands.Cog):
         await ctx.send(
             "The events channel has been cleared. Automated scheduled events posts are now disabled."
         )
+
+    @serverconfig.command(name="roles")
+    async def roles_set(
+            self, ctx, member: discord.Role = None, unpaid: discord.Role = None, alum: discord.Role = None):
+        """
+        Sets the roles which the bot will use for verification
+        `<member>` member role
+        `<unpaid>` unpaid dues role
+        `[alum]` alumnus role
+        """
+        if type(member) is not discord.Role:
+            await ctx.send("Member role must be a valid discord role")
+            return
+        if type(unpaid) is not discord.Role:
+            await ctx.send("Unpaid Dues role must be a valid discord role")
+            return
+        if alum == None:
+            await ctx.send(
+                f"Server roles have been set.\n```Member: {member.mention}\nUnpaid Dues: {unpaid.mention}```"
+            )
+            await self.config.guild(ctx.guild).roleMember.set(member.id)
+            await self.config.guild(ctx.guild).roleUnpaid.set(unpaid.id)
+            return
+        await ctx.send(
+            f"Server roles have been set.\n```Member: {member.mention}\nUnpaid Dues: {unpaid.mention}\nAlumnus: {alum.mention}```"
+        )
+        await self.config.guild(ctx.guild).roleMember.set(member.id)
+        await self.config.guild(ctx.guild).roleUnpaid.set(unpaid.id)
+        await self.config.guild(ctx.guild).roleAlum.set(alum.id)
 
     @commands.group(autohelp=True)
     @commands.guild_only()
@@ -256,23 +285,26 @@ class Rehoboam(commands.Cog):
             "The alum range has been cleared. Dues verification is now disabled."
         )
 
-    @sheetsconfig.command(name="verifiedcolumn")
-    async def vercolset(self, ctx, column: str):
+    @sheetsconfig.command(name="verrange")
+    async def verrangeset(self, ctx, range_open: str, range_close: str):
         """
-        Sets the Google Sheets column that contains user verified info as TRUE/FALSE
-        `<column>` the letter of the column
+        Sets the Google Sheets cell range that contains member verified info as TRUE/FALSE
+        `<range_open>` the cell of the start of the range in A1 notation
+        `<range_close>` the cell of the end of the range in A1 notation
         """
-        await self.config.guild(ctx.guild).verified_column.set(column)
-        await ctx.send(f"The user verified column has been set to {column}")
+        await self.config.guild(ctx.guild).ver_cells_open.set(range_open)
+        await self.config.guild(ctx.guild).ver_cells_close.set(range_close)
+        await ctx.send(f"The verified range has been set to {range_open}:{range_close}")
 
-    @sheetsconfig.command(name="clearverifiedcolumn")
-    async def vercolset_clear(self, ctx):
+    @sheetsconfig.command(name="clearverrange")
+    async def verrangeset_clear(self, ctx):
         """
-        Unsets the Google Sheets column that contains user verified info as TRUE/FALSE
+        Unsets the Google Sheets cell range that contains member verified info. This will disable dues verification
         """
-        await self.config.guild(ctx.guild).verified_column.clear()
+        await self.config.guild(ctx.guild).ver_cells_open.clear()
+        await self.config.guild(ctx.guild).ver_cells_close.clear()
         await ctx.send(
-            "The user verified column has been cleared."
+            "The verified range has been cleared. Dues verification is now disabled."
         )
 
     @sheetsconfig.command(name="joinedcolumn")
@@ -370,38 +402,23 @@ class Rehoboam(commands.Cog):
             "The worksheet name has been cleared. Dues verification is now disabled."
         )
 
-    @sheetsconfig.command(name="looptime")
-    async def sheet_loop_freq_set(self, ctx, hours: int, minutes: int, seconds: int):
+    @sheetsconfig.command(name="updatefreq")
+    async def freqset(self, ctx, seconds: int):
         """
-        Set Google Sheets data loop frequency.
-        `<hours>` number of hours
-        `<minutes>` number of minutes
-        `<seconds>` number of seconds
+        Sets the Google Sheets data retrieval frequency.
+        `<seconds>` the interval at which new sheets data will be retrieved in seconds
         """
-        hrs_sec = hours * 60 * 60
-        mins_sec =  minutes * 60
-        frequency = hrs_sec + mins_sec + seconds
+        await self.config.guild(ctx.guild).sheetupdatefreq.set(seconds)
+        await ctx.send(f"The data retrieval frequency has been set to {seconds} seconds")
 
-        interval_format = datetime.time(hour= hours, minute = minutes, second= seconds).isoformat()
-
-        if frequency < 1:
-            await ctx.send(
-                "Time interval cannot be less than 1 second."
-            )
-        else:
-            await self.config.guild(ctx.guild).sheet_loop_freq.set(frequency)
-            await ctx.send(
-                f"Sheets data retrieval time interval set to {interval_format}."
-            )
-
-    @sheetsconfig.command(name="clearinterval")
-    async def sheet_loop_freq_clear(self, ctx):
+    @sheetsconfig.command(name="clearupdatefreq")
+    async def freq_clear(self, ctx):
         """
-        Reset Google Sheets data loop frequency to default of 3600 seconds
+        Resets the Google Sheets data retrieval frequency. Default is 0 seconds. New data will be retrieved on every use of [p]verify.
         """
-        await self.config.guild(ctx.guild).sheet_loop_freq.clear()
+        await self.config.guild(ctx.guild).sheetupdatefreq.clear()
         await ctx.send(
-            f"Sheets data retrieval time set to 01:00:00."
+            "The data retrieval frequency has been reset."
         )
 
     @checks.mod_or_permissions(administrator=True)
@@ -455,6 +472,7 @@ class Rehoboam(commands.Cog):
                     'Error in command.'
                 )
 
+    # noinspection NonAsciiCharacters
     @commands.command()
     @commands.guild_only()
     async def verify(
@@ -465,353 +483,238 @@ class Rehoboam(commands.Cog):
         `<mix email>` Your full WVU mix email.
         `<alum>` If verifying alum status, write "alum". Otherwise, leave blank
         """
+        # Declare vars as global
+        global emailsListFlat
+        global duesListFlat
+        global alumListFlat
+        global verListFlat
+        global rowIndex
+        global emailIndex
+        global time_lastupdate
 
-      # Check alum str
+        # Get channel IDs
+        dues_id = await self.config.guild(ctx.guild).dues_channel()
+        dues_channel = ctx.guild.get_channel(dues_id)
+
+        admin_id = await self.config.guild(ctx.guild).admin_channel()
+        adminchannel = ctx.guild.get_channel(admin_id)
+
+        log_id = await self.config.guild(ctx.guild).dues_log_channel()
+        log_channel = ctx.guild.get_channel(log_id)
+
+        # Check channels
+        if admin_id is None:
+            await ctx.reply("""
+                        `The channel for admin commands is not set. Use '[p]serverconfig adminchannel' command to set the channel. Disregard this message if you are not a server admin`
+                        """)
+            return
+
+        if dues_channel is None:
+            await adminchannel.send("""
+            `The channel for dues verification is not set. Use '[p]serverconfig dueschannel' command to set the channel`
+            """)
+            return
+
+        if ctx.channel != dues_channel:
+            return
+
+        # Check alum str
         if alum is not None:
             alum = alum.lower()
             if alum != "alum":
                 await ctx.send("Invalid argument in command. Please use `[p]help verify` to view command information. ")
                 return
 
-      # Google
-        scope = ["https://spreadsheets.google.com/feeds",
-                 "https://www.googleapis.com/auth/spreadsheets",
-                 "https://www.googleapis.com/auth/drive.file",
-                 "https://www.googleapis.com/auth/drive"]
-
-        dues_json = await self.config.guild(ctx.guild).server_json()
-        app_json = open(f'{dues_json}')
-        app_creds_dictionary = json.load(app_json)
-
-      # Ranges and whatnot
-        dues_range_open = await self.config.guild(ctx.guild).dues_cells_open()
-        dues_range_close = await self.config.guild(ctx.guild).dues_cells_close()
-        emails_range_open = await self.config.guild(ctx.guild).emails_cells_open()
-        emails_range_close = await self.config.guild(ctx.guild).emails_cells_close()
-        alum_range_open = await self.config.guild(ctx.guild).alum_cells_open()
-        alum_range_close = await self.config.guild(ctx.guild).alum_cells_close()
-        ver_col = await self.config.guild(ctx.guild).verified_column()
-        join_col = await self.config.guild(ctx.guild).joined_column()
-        nickname_col = await self.config.guild(ctx.guild).nickname_column()
-        username_col = await self.config.guild(ctx.guild).username_column()
-
-        # Connection to specific worksheet
-        sheet_name = await self.config.guild(ctx.guild).sh_name()
-        worksheet_name = await self.config.guild(ctx.guild).wks_name()
-        credentials = ServiceAccountCredentials.from_json_keyfile_dict(app_creds_dictionary, scope)
-        sa = gspread.authorize(credentials)
-        sh = sa.open(f"{sheet_name}")
-        wks = sh.worksheet(f"{worksheet_name}")
-
-        # Server handling bullshit
-        roleMember = 'Member'
-        roleUnpaid = 'Unpaid Dues'
-        roleAlum = 'Alum'
-
-        g_id = await self.config.guild(ctx.guild).guild_id()
-        if g_id is None:
-            await self.config.guild(ctx.guild).guild_id.set(ctx.guild.id)
-
-        admin_id = await self.config.guild(ctx.guild).admin_channel()
-        if admin_id is None:
-            await ctx.reply("""
-                        `The channel for admin commands is not set. Use '[p]adminchannel' command to set the channel. Disregard this message if you are not a server admin`
-                        """)
-            return
-        adminchannel = ctx.guild.get_channel(admin_id)
-
-        dues_id = await self.config.guild(ctx.guild).dues_channel()
-        dues_channel = ctx.guild.get_channel(dues_id)
-
-        log_id = await self.config.guild(ctx.guild).dues_log_channel()
-        log_channel = ctx.guild.get_channel(log_id)
-
-        if dues_channel is None:
-            await adminchannel.send("""
-            `The channel for dues verification is not set. Use '[p]dueschannel' command to set the channel`
-            """)
-            return
-        if dues_json is None:
-            await adminchannel.send("""
-            `Google Sheets JSON is not set. Use '[p]serverjson' command to set the file location.`
-            """)
-            return
-        if sheet_name is None:
-            await adminchannel.send("""
-            `Google Sheets sheet name is not set. Use '[p]sh' to set the sheet name.`
-            """)
-            return
-        if worksheet_name is None:
-            await adminchannel.send("""
-            `Google Sheets worksheet name is not set. Use '[p]wks' to set the sheet name`
-            """)
-            return
-        if dues_range_open is None:
-            await adminchannel.send("""
-            `Google Sheets dues cell range has no left bound. Use '[p]duesrange' to set the bounds.`
-            """)
-            return
-        if dues_range_close is None:
-            await adminchannel.send("""
-            `Google Sheets dues cell range has no right bound. Use '[p]duessrange' to set the bounds.`
-            """)
-            return
-        if emails_range_open is None:
-            await adminchannel.send("""
-            `Google Sheets emails cell range has no left bound. Use '[p]emailsrange' to set the bounds.`
-            """)
-            return
-        if emails_range_close is None:
-            await adminchannel.send("""
-            `Google Sheets emails cell range has no right bound. Use '[p]emailsrange' to set the bounds.`
-            """)
-            return
-        if alum_range_open is None:
-            await adminchannel.send("""
-            `Google Sheets alum cell range has no left bound. Use '[p]alumrange' to set the bounds.`
-            """)
-            return
-        if alum_range_close is None:
-            await adminchannel.send("""
-            `Google Sheets alum cell range has no right bound. Use '[p]alumrange' to set the bounds.`
-            """)
-            return
-        if dues_channel != ctx.channel:
-            return
-
         if '@' in mix_email:
             # Create Flat List from User Message
             mixEmailInit = [mix_email]
             mixEmail = [x.lower() for x in mixEmailInit]
 
-            global counter
-            counter = await self.config.guild(ctx.guild).sheet_update_count()
-            global time_lastupdate
-            time_lastupdate = None
-            if counter is not None:
-                global emailsListFlat
-                global duesListFlat
-                global emailsList
+            await googlesheetsfetch(self, ctx, mixEmail)
 
-                # Create Flat List from Sheets Emails
-                emailsList = wks.get(f'{emails_range_open}:{emails_range_close}')
-                emailsListFlatInit = list(itertools.chain(*emailsList))
-                emailsListFlat = [x.lower() for x in emailsListFlatInit]
+            # Get vars from self
+            emailsListFlat = await self.config.guild(ctx.guild).emailsListFlat()
+            duesListFlat = await self.config.guild(ctx.guild).duesListFlat()
+            alumListFlat = await self.config.guild(ctx.guild).alumListFlat()
+            verListFlat = await self.config.guild(ctx.guild).verListFlat()
+            rowIndex = await self.config.guild(ctx.guild).rowIndex()
+            emailIndex = await self.config.guild(ctx.guild).emailIndex()
+            time_lastupdate = await self.config.guild(ctx.guild).time_lastupdate()
 
-                # Create Flat List from Sheets Dues
-                duesList = wks.get(f'{dues_range_open}:{dues_range_close}')
-                duesListFlatInit = list(itertools.chain(*duesList))
-                duesListFlat = [x.lower() for x in duesListFlatInit]
+            # Send Email Not Found Message to User
+            if ctx.channel == dues_channel and (rowIndex == None or emailIndex == None):
+                async with ctx.channel.typing():
+                    await asyncio.sleep(.25)
+                await ctx.send(
+                    'This email does not appear in our records. Please check your message for formatting/spelling errors. Contact an admin for assistance if the problem persists.'
+                )
+                await clearindex(self, ctx)
+                return
 
-                # Create Flat List from Sheet Alums
-                alumList = wks.get(f'{alum_range_open}:{alum_range_close}')
-                alumListFlatInit = list(itertools.chain(*alumList))
-                alumListFlat = [x.lower() for x in alumListFlatInit]
+        # Get role vars from self
+        roleMember = await self.config.guild(ctx.guild).roleMember()
+        roleUnpaid = await self.config.guild(ctx.guild).roleUnpaid()
+        roleAlum = await self.config.guild(ctx.guild).roleAlum()
 
-                # Print Sheets Data Retrieval Info to Channel
-                counter = counter + 1
-                try:
-                    # If OS is MacOS
-                    await adminchannel.send(
-                        time.strftime(f"""
-                        `Sheets data successfully retrieved at %-I:%M:%S %p.\nFetch {counter}\n`
-                        """)
-                    )
-                except ValueError:
-                    # If OS is Windows
-                    await adminchannel.send(
-                        time.strftime(f"""
-                                    `Sheets data successfully retrieved at %#I:%M:%S %p.\nFetch {counter}\n`
-                                    """)
-                    )
-                await self.config.guild(ctx.guild).sheet_update_count.set(counter)
-                await self.config.guild(ctx.guild).time_lastupdate.set(time.time())
+        # Get Nickname and Username
+        nickname = ctx.message.author.display_name
+        if type(nickname) is not str:
+            nickname = ""
+        username = ctx.message.author.name
+        discriminator = ctx.message.author.discriminator
+        if type(username) is not str or type(discriminator) is not str:
+            username_discriminator = ""
+        else:
+            username_discriminator = f"{username}#{discriminator}"
 
-                # Check if User Message is in Sheets Email List
-                if [email for email in emailsListFlat if email in mixEmail]:
-                    # Get Sheets Dues Cell and Verified Cell from Emails List Index
-                    rowIndex = emailsListFlat.index(mixEmail[0])
-                    emailIndexInit = emailsList.index(mixEmail)
-                    emailIndex = emailIndexInit + 2
-                    verifiedCell = wks.get(f'{ver_col}{emailIndex}')
-                    verifiedCell = verifiedCell[0][0]
+        # Check if User is Alumnus. Code 1
+        if alum == "alum":
+            if alumListFlat[rowIndex].lower() == 'true' and verListFlat[rowIndex].lower() == 'false':
+                # Write to sheet
+                code = 1
+                await googlesheetswrite(self, ctx, code, nickname, username_discriminator)
 
-                    # Get Nickname and Username
-                    nickname = ctx.message.author.display_name
-                    if type(nickname) is not str:
-                        nickname = ""
-                    username = ctx.message.author.name
-                    discriminator = ctx.message.author.discriminator
-                    if type(username) is not str or type(discriminator) is not str:
-                        username_discriminator = ""
-                    else:
-                        username_discriminator = f"{username}#{discriminator}"
+                # Updates roles
+                roleA = discord.utils.get(ctx.guild.roles, id=roleAlum)
+                await ctx.author.add_roles(roleA)
 
-                    # Check if User is Alumnus
-                    if alum == "alum":
-                        if alumListFlat[rowIndex] == 'true' and verifiedCell == 'FALSE':
-                            # Updates roles
-                            roleA = discord.utils.get(ctx.guild.roles, name=roleAlum)
-                            await ctx.author.add_roles(roleA)
+                roleM = discord.utils.get(ctx.guild.roles, id=roleMember)
+                roleU = discord.utils.get(ctx.guild.roles, id=roleUnpaid)
+                await ctx.author.remove_roles(roleM, roleU)
 
-                            roleM = discord.utils.get(ctx.guild.roles, name=roleMember)
-                            roleU = discord.utils.get(ctx.guild.roles, name=roleUnpaid)
-                            await ctx.author.remove_roles(roleM, roleU)
+                # DM Verified User
+                await ctx.author.send(
+                    f'Thank you for verifying in the {ctx.guild.name} server!'
+                )
 
-                            # Update 'Joined Discord' and 'Bot Verified' Columns
-                            wks.batch_update([{
-                                'range': f'{join_col}{emailIndex}:{username_col}{emailIndex}',
-                                'values': [['TRUE', 'TRUE', f'{nickname}', f'{username_discriminator}']],
-                            }],
-                                value_input_option='USER_ENTERED')
+                # Log to Verification Log
+                await log_channel.send(
+                    f'{ctx.author.mention} has verified alumni status with the email `{mix_email}`.'
+                )
 
-                            # DM Verified User
-                            今天 = date.today().replace(year=1)
-                            今年 = date.today().year
-                            元旦 = date(year=1, month=1, day=1)
-                            年中 = date(year=1, month=8, day=1)
-                            除夕 = date(year=1, month=12, day=31)
+                if time_lastupdate != 0:
+                    await self.config.guild(ctx.guild).time_lastupdate.set(1)
+                await clearindex(self, ctx)
+                return
 
-                            if 元旦 <= 今天 < 年中:
-                                學年 = f"{今年 - 1}-{今年} "
-                            elif 年中 <= 今天 <= 除夕:
-                                學年 = f"{今年}-{今年 + 1} "
-                            else:
-                                學年 = f"\u2060"
+            elif alumListFlat[rowIndex].lower() == 'true' and verListFlat[rowIndex].lower() == 'true':
+                async with ctx.channel.typing():
+                    await asyncio.sleep(.25)
+                await ctx.send(
+                    'Our records show this email has already been used to verify. Please contact an admin to resolve the issue.'
+                )
 
-                            await ctx.author.send(
-                                f'Thank you for verifying in the {ctx.guild.name} server!'
-                            )
+                await clearindex(self, ctx)
+                return
 
-                            # Log to Verification Log
-                            await log_channel.send(
-                                f'{ctx.author.mention} has verified alumni status.'
-                            )
-                            return
+            elif alumListFlat[rowIndex].lower() == 'false' and verListFlat[rowIndex].lower() == 'true':
+                async with ctx.channel.typing():
+                    await asyncio.sleep(.25)
+                await ctx.send(
+                    'Our records show this email does not belong to an alumnus. If this is incorrect, please contact an admin to resolve the issue.'
+                )
 
-                        elif alumListFlat[rowIndex] == 'true' and verifiedCell == 'TRUE':
-                            async with ctx.channel.typing():
-                                await asyncio.sleep(.25)
-                            await ctx.send(
-                                'Our records show this email has already been used to verify. Please contact an admin to resolve the issue.'
-                            )
-                            return
+                await clearindex(self, ctx)
+                return
 
-                        elif alumListFlat[rowIndex] == 'false' and verifiedCell == 'TRUE':
-                            async with ctx.channel.typing():
-                                await asyncio.sleep(.25)
-                            await ctx.send(
-                                'Our records show this email does not belong to an alumnus. If this is incorrect, please contact an admin to resolve the issue.'
-                            )
-                            return
+            elif alumListFlat[rowIndex].lower() == 'false' and verListFlat[rowIndex].lower() == 'false':
+                async with ctx.channel.typing():
+                    await asyncio.sleep(.25)
+                await ctx.send(
+                    'Our records show this email does not belong to an alumnus. If this is incorrect, please contact an admin to resolve the issue.'
+                )
 
-                        elif alumListFlat[rowIndex] == 'false' and verifiedCell == 'FALSE':
-                            async with ctx.channel.typing():
-                                await asyncio.sleep(.25)
-                            await ctx.send(
-                                'Our records show this email does not belong to an alumnus. If this is incorrect, please contact an admin to resolve the issue.'
-                            )
-                            return
+                await clearindex(self, ctx)
+                return
 
-                    # Paid Dues Not Verified
-                    if duesListFlat[rowIndex] == 'true' and verifiedCell == 'FALSE':
-                        # Updates roles
-                        roleM = discord.utils.get(ctx.guild.roles, name=roleMember)
-                        await ctx.author.add_roles(roleM)
+        # Paid Dues Not Verified. Code 2
+        if duesListFlat[rowIndex].lower() == 'true' and verListFlat[rowIndex].lower() == 'false':
+            # Write to sheet
+            code = 2
+            await googlesheetswrite(self, ctx, code, nickname, username_discriminator)
 
-                        roleU = discord.utils.get(ctx.guild.roles, name=roleUnpaid)
-                        await ctx.author.remove_roles(roleU)
+            # Updates roles
+            roleM = discord.utils.get(ctx.guild.roles, id=roleMember)
+            await ctx.author.add_roles(roleM)
 
-                        # Update 'Joined Discord' and 'Bot Verified' Columns
-                        wks.batch_update([{
-                            'range': f'{join_col}{emailIndex}:{username_col}{emailIndex}',
-                            'values': [['TRUE', 'TRUE', f'{nickname}', f'{username_discriminator}']],
-                        }],
-                            value_input_option='USER_ENTERED')
+            roleU = discord.utils.get(ctx.guild.roles, id=roleUnpaid)
+            await ctx.author.remove_roles(roleU)
 
-                        # DM Verified User
-                        今天 = date.today().replace(year=1)
-                        今年 = date.today().year
-                        元旦 = date(year=1, month=1, day=1)
-                        年中 = date(year=1, month=8, day=1)
-                        除夕 = date(year=1, month=12, day=31)
+            # DM Verified User
+            今天 = date.today().replace(year=1)
+            今年 = date.today().year
+            元旦 = date(year=1, month=1, day=1)
+            年中 = date(year=1, month=8, day=1)
+            除夕 = date(year=1, month=12, day=31)
 
-                        if 元旦<=今天<年中:
-                            學年 = f"{今年-1}-{今年} "
-                        elif 年中<=今天<=除夕:
-                            學年 = f"{今年}-{今年+1} "
-                        else:
-                            學年 = f"\u2060"
+            if 元旦<=今天<年中:
+                學年 = f"{今年-1}-{今年} "
+            elif 年中<=今天<=除夕:
+                學年 = f"{今年}-{今年+1} "
+            else:
+                學年 = f"\u2060"
 
-                        await ctx.author.send(
-                            f'Thank you for verifying your {學年}dues in the {ctx.guild.name} server!'
-                        )
+            await ctx.author.send(
+                f'Thank you for verifying your {學年}dues in the {ctx.guild.name} server!'
+            )
 
-                        # Log to Verification Log
-                        await log_channel.send(
-                            f'{ctx.author.mention} has verified dues.'
-                        )
-                        return
+            # Log to Verification Log
+            await log_channel.send(
+                f'{ctx.author.mention} has verified dues with the email `{mix_email}`.'
+            )
 
-                    # Paid Dues Already Verified
-                    elif duesListFlat[rowIndex] == 'true' and verifiedCell == 'TRUE':
-                        async with ctx.channel.typing():
-                            await asyncio.sleep(.25)
-                        await ctx.send(
-                            'Our records show this email has already been used to verify dues. If this was not done by you, please contact an admin to resolve the issue.'
-                        )
-                        return
+            if time_lastupdate != 0:
+                await self.config.guild(ctx.guild).time_lastupdate.set(1)
+            await clearindex(self, ctx)
+            return
 
-                    # Unpaid Dues but Somehow Verified
-                    elif duesListFlat[rowIndex] == 'false' and verifiedCell == 'TRUE':
-                        wks.batch_update([{
-                            'range': f'{join_col}{emailIndex}',
-                            'values': [['FALSE']],
-                        }],
-                            value_input_option='USER_ENTERED')
+        # Paid Dues Already Verified
+        elif duesListFlat[rowIndex].lower() == 'true' and verListFlat[rowIndex].lower() == 'true':
+            async with ctx.channel.typing():
+                await asyncio.sleep(.25)
+            await ctx.send(
+                'Our records show this email has already been used to verify dues. If this was not done by you, please contact an admin to resolve the issue.'
+            )
 
-                        # Check if User Has 'Member' Role
-                        for role in ctx.author.roles:
-                            if str(role) == 'Member':
-                                # Remove 'Member' Role
-                                roleM = discord.utils.get(ctx.guild.roles, name=roleMember)
-                                await ctx.author.remove_roles(roleM)
+            await clearindex(self, ctx)
+            return
 
-                                # Add 'Unpaid Dues' Role
-                                roleU = discord.utils.get(ctx.guild.roles, name=roleUnpaid)
-                                await ctx.author.add_roles(roleU)
+        # Unpaid Dues but Somehow Verified. Code 3
+        elif duesListFlat[rowIndex].lower() == 'false' and verListFlat[rowIndex].lower() == 'true':
+            # Write to sheet
+            code = 3
+            await googlesheetswrite(self, ctx, code, None, None)
 
-                        # Send Unpaid Dues Message to User
-                        async with ctx.channel.typing():
-                            await asyncio.sleep(.25)
-                        await ctx.send(
-                            'Unable to verify dues. Our records show you have not paid dues. Contact an admin for assistance if you believe this is a mistake.'
-                        )
-                        return
+            # Check if User Has 'Member' Role
+            for role in ctx.author.roles:
+                if str(role) == 'Member':
+                    # Remove 'Member' Role
+                    roleM = discord.utils.get(ctx.guild.roles, id=roleMember)
+                    await ctx.author.remove_roles(roleM)
 
-                    # Send Unpaid Dues Message to User
-                    else:
-                        async with ctx.channel.typing():
-                            await asyncio.sleep(.25)
-                        await ctx.send(
-                            'Unable to verify dues. Our records show you have not paid dues. Contact an admin for assistance if you believe this is a mistake.'
-                        )
-                        return
+                    # Add 'Unpaid Dues' Role
+                    roleU = discord.utils.get(ctx.guild.roles, id=roleUnpaid)
+                    await ctx.author.add_roles(roleU)
 
-                # Send Email Not Found Message to User
-                elif dues_channel == ctx.channel.id:
-                    async with ctx.channel.typing():
-                        await asyncio.sleep(.25)
-                    await ctx.send(
-                        'This email does not appear in our records. Please check your message for formatting/spelling errors. Contact an admin for assistance if the problem persists.'
-                    )
-                    return
+            # Send Unpaid Dues Message to User
+            async with ctx.channel.typing():
+                await asyncio.sleep(.25)
+            await ctx.send(
+                'Unable to verify dues. Our records show you have not paid dues. Contact an admin for assistance if you believe this is a mistake.'
+            )
+
+            await clearindex(self, ctx)
+            return
+
+        # Send Unpaid Dues Message to User
         else:
             async with ctx.channel.typing():
                 await asyncio.sleep(.25)
             await ctx.send(
-                'This does not appear to be a valid email. Please check your message for formatting/spelling errors.'
+                'Unable to verify dues. Our records show you have not paid dues. Contact an admin for assistance if you believe this is a mistake.'
             )
+
+            await clearindex(self, ctx)
             return
 
     @commands.Cog.listener()
@@ -873,3 +776,238 @@ def check_files():
     if not dataIO.is_valid_json(f):
         print("Creating empty scheduled_events.json...")
         dataIO.save_json(f, [])
+
+async def googlesheetsfetch(self, ctx, mixEmail):
+    global counter
+    global time_lastupdate
+    global emailsListFlat
+    global duesListFlat
+    global emailsList
+    time_diff = await self.config.guild(ctx.guild).sheetupdatefreq()
+    time_lastupdate = await self.config.guild(ctx.guild).time_lastupdate()
+    time_now = time.time()
+
+    if (time_now - time_diff) < time_lastupdate:
+        code = 1
+    else:
+        code = 2
+
+    if code == 1:
+        # Get vars from self
+        emailsList = await self.config.guild(ctx.guild).emailsList()
+        emailsListFlat = await self.config.guild(ctx.guild).emailsListFlat()
+        duesListFlat = await self.config.guild(ctx.guild).duesListFlat()
+
+        # Check if User Message is in Sheets Email List
+        if [email for email in emailsListFlat if email in mixEmail]:
+            # Get Sheets Dues Cell and Verified Cell from Emails List Index
+            rowIndex = emailsListFlat.index(mixEmail[0]) + 1
+            emailIndexInit = emailsList.index(mixEmail)
+            emailIndex = emailIndexInit + 2
+
+            # Write vars to self
+            await self.config.guild(ctx.guild).rowIndex.set(rowIndex)
+            await self.config.guild(ctx.guild).emailIndex.set(emailIndex)
+
+    elif code == 2:
+        # Google
+        scope = ["https://spreadsheets.google.com/feeds",
+                 "https://www.googleapis.com/auth/spreadsheets",
+                 "https://www.googleapis.com/auth/drive.file",
+                 "https://www.googleapis.com/auth/drive"]
+
+        dues_json = await self.config.guild(ctx.guild).server_json()
+        app_json = open(f'{dues_json}')
+        app_creds_dictionary = json.load(app_json)
+
+        # Ranges and whatnot
+        dues_range_open = await self.config.guild(ctx.guild).dues_cells_open()
+        dues_range_close = await self.config.guild(ctx.guild).dues_cells_close()
+        emails_range_open = await self.config.guild(ctx.guild).emails_cells_open()
+        emails_range_close = await self.config.guild(ctx.guild).emails_cells_close()
+        alum_range_open = await self.config.guild(ctx.guild).alum_cells_open()
+        alum_range_close = await self.config.guild(ctx.guild).alum_cells_close()
+        ver_range_open = await self.config.guild(ctx.guild).ver_cells_open()
+        ver_range_close = await self.config.guild(ctx.guild).ver_cells_close()
+
+        # Connection to specific worksheet
+        sheet_name = await self.config.guild(ctx.guild).sh_name()
+        worksheet_name = await self.config.guild(ctx.guild).wks_name()
+        credentials = ServiceAccountCredentials.from_json_keyfile_dict(app_creds_dictionary, scope)
+        sa = gspread.authorize(credentials)
+        sh = sa.open(f"{sheet_name}")
+        wks = sh.worksheet(f"{worksheet_name}")
+
+        # Check for all vars
+        g_id = await self.config.guild(ctx.guild).guild_id()
+        if g_id is None:
+            await self.config.guild(ctx.guild).guild_id.set(ctx.guild.id)
+
+        admin_id = await self.config.guild(ctx.guild).admin_channel()
+        adminchannel = ctx.guild.get_channel(admin_id)
+
+        if dues_json is None:
+            await adminchannel.send("""
+            `Google Sheets JSON is not set. Use '[p]sheetsconfig serverjson' command to set the file location.`
+            """)
+            return
+        if sheet_name is None:
+            await adminchannel.send("""
+            `Google Sheets sheet name is not set. Use '[p]sheetsconfig sh' to set the sheet name.`
+            """)
+            return
+        if worksheet_name is None:
+            await adminchannel.send("""
+            `Google Sheets worksheet name is not set. Use '[p]sheetsconfig wks' to set the sheet name`
+            """)
+            return
+        if dues_range_open is None:
+            await adminchannel.send("""
+            `Google Sheets dues cell range has no left bound. Use '[p]sheetsconfig duesrange' to set the bounds.`
+            """)
+            return
+        if dues_range_close is None:
+            await adminchannel.send("""
+            `Google Sheets dues cell range has no right bound. Use '[p]sheetsconfig duessrange' to set the bounds.`
+            """)
+            return
+        if emails_range_open is None:
+            await adminchannel.send("""
+            `Google Sheets emails cell range has no left bound. Use '[p]sheetsconfig emailsrange' to set the bounds.`
+            """)
+            return
+        if emails_range_close is None:
+            await adminchannel.send("""
+            `Google Sheets emails cell range has no right bound. Use '[p]sheetsconfig emailsrange' to set the bounds.`
+            """)
+            return
+        if alum_range_open is None:
+            await adminchannel.send("""
+            `Google Sheets alum cell range has no left bound. Use '[p]sheetsconfig alumrange' to set the bounds.`
+            """)
+            return
+        if alum_range_close is None:
+            await adminchannel.send("""
+            `Google Sheets alum cell range has no right bound. Use '[p]sheetsconfig alumrange' to set the bounds.`
+            """)
+            return
+        if ver_range_open is None:
+            await adminchannel.send("""
+            `Google Sheets verified cell range has no left bound. Use '[p]sheetsconfig verrange' to set the bounds.`
+            """)
+            return
+        if ver_range_close is None:
+            await adminchannel.send("""
+            `Google Sheets verified cell range has no right bound. Use '[p]sheetsconfig verrange' to set the bounds.`
+            """)
+            return
+
+        counter = await self.config.guild(ctx.guild).sheet_update_count()
+        time_lastupdate = None
+        if counter is not None:
+            # Create Flat List from Sheets Emails
+            emailsList = wks.get(f'{emails_range_open}:{emails_range_close}')
+            emailsListFlatInit = list(itertools.chain(*emailsList))
+            emailsListFlat = [x.lower() for x in emailsListFlatInit]
+
+            # Create Flat List from Sheets Dues
+            duesList = wks.get(f'{dues_range_open}:{dues_range_close}')
+            duesListFlatInit = list(itertools.chain(*duesList))
+            duesListFlat = [x.lower() for x in duesListFlatInit]
+
+            # Create Flat List from Sheet Alums
+            alumList = wks.get(f'{alum_range_open}:{alum_range_close}')
+            alumListFlatInit = list(itertools.chain(*alumList))
+            alumListFlat = [x.lower() for x in alumListFlatInit]
+
+            # Create Flat List from Sheet Verified
+            verList = wks.get(f'{ver_range_open}:{ver_range_close}')
+            verListFlatInit = list(itertools.chain(*verList))
+            verListFlat = [x.lower() for x in verListFlatInit]
+
+            # Write vars to self
+            await self.config.guild(ctx.guild).emailsList.set(emailsList)
+            await self.config.guild(ctx.guild).emailsListFlat.set(emailsListFlat)
+            await self.config.guild(ctx.guild).duesListFlat.set(duesListFlat)
+            await self.config.guild(ctx.guild).alumListFlat.set(alumListFlat)
+            await self.config.guild(ctx.guild).verListFlat.set(verListFlat)
+
+            # Check if User Message is in Sheets Email List
+            if [email for email in emailsListFlat if email in mixEmail]:
+                # Get Sheets Dues Cell and Verified Cell from Emails List Index
+                rowIndex = emailsListFlat.index(mixEmail[0]) + 1
+                emailIndexInit = emailsList.index(mixEmail)
+                emailIndex = emailIndexInit + 2
+
+                # Write vars to self
+                await self.config.guild(ctx.guild).rowIndex.set(rowIndex)
+                await self.config.guild(ctx.guild).emailIndex.set(emailIndex)
+            else:
+                await self.config.guild(ctx.guild).rowIndex.set(None)
+                await self.config.guild(ctx.guild).emailIndex.set(None)
+
+            # Print Sheets Data Retrieval Info to Channel
+            counter = counter + 1
+            try:
+                # If OS is MacOS
+                await adminchannel.send(
+                    time.strftime(f"""
+                    `Sheets data successfully retrieved at %-I:%M:%S %p.\nFetch {counter}\n`
+                    """)
+                )
+            except ValueError:
+                # If OS is Windows
+                await adminchannel.send(
+                    time.strftime(f"""
+                                `Sheets data successfully retrieved at %#I:%M:%S %p.\nFetch {counter}\n`
+                                """)
+                )
+            await self.config.guild(ctx.guild).sheet_update_count.set(counter)
+            await self.config.guild(ctx.guild).time_lastupdate.set(time.time())
+
+async def googlesheetswrite(self, ctx, code: int, nickname = None, username_discriminator = None, ):
+    if type(code) is not int:
+        await ctx.send(f'Error in function `googlesheetswrite`\nCode is type `{type(code)}`')
+    # Google
+    scope = ["https://spreadsheets.google.com/feeds",
+             "https://www.googleapis.com/auth/spreadsheets",
+             "https://www.googleapis.com/auth/drive.file",
+             "https://www.googleapis.com/auth/drive"]
+
+    dues_json = await self.config.guild(ctx.guild).server_json()
+    app_json = open(f'{dues_json}')
+    app_creds_dictionary = json.load(app_json)
+
+    # Ranges and whatnot
+    join_col = await self.config.guild(ctx.guild).joined_column()
+    username_col = await self.config.guild(ctx.guild).username_column()
+    emailIndex = await self.config.guild(ctx.guild).emailIndex()
+
+    # Connection to specific worksheet
+    sheet_name = await self.config.guild(ctx.guild).sh_name()
+    worksheet_name = await self.config.guild(ctx.guild).wks_name()
+    credentials = ServiceAccountCredentials.from_json_keyfile_dict(app_creds_dictionary, scope)
+    sa = gspread.authorize(credentials)
+    sh = sa.open(f"{sheet_name}")
+    wks = sh.worksheet(f"{worksheet_name}")
+
+    if code == 1 or code == 2:
+        # Update 'Joined Discord' and 'Bot Verified' Columns
+        wks.batch_update([{
+            'range': f'{join_col}{emailIndex}:{username_col}{emailIndex}',
+            'values': [['TRUE', 'TRUE', f'{nickname}', f'{username_discriminator}']],
+        }],
+            value_input_option='USER_ENTERED')
+    elif code == 3:
+        wks.batch_update([{
+            'range': f'{join_col}{emailIndex}',
+            'values': [['FALSE']],
+        }],
+            value_input_option='USER_ENTERED')
+    else:
+        ctx.send(f'Error in function `googlesheetswrite`\nInvalid code. Code is `code`')
+        return
+
+async def clearindex(self,ctx):
+    await self.config.guild(ctx.guild).rowIndex.set(None)
+    await self.config.guild(ctx.guild).emailIndex.set(None)
