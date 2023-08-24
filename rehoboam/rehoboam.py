@@ -627,10 +627,6 @@ class Rehoboam(commands.Cog):
                 await clearindex(self, ctx)
                 return
 
-        await ctx.send(duesListFlat[rowIndex-1])
-        await ctx.send(duesListFlat[rowIndex])
-        await ctx.send(duesListFlat[rowIndex+1])
-        await ctx.send(rowIndex)
         # Paid Dues Not Verified. Code 2
         if duesListFlat[rowIndex].lower() == 'true' and verListFlat[rowIndex].lower() == 'false':
             # Write to sheet
@@ -969,7 +965,7 @@ async def googlesheetsfetch(self, ctx, mixEmail):
             await self.config.guild(ctx.guild).sheet_update_count.set(counter)
             await self.config.guild(ctx.guild).time_lastupdate.set(time.time())
 
-async def googlesheetswrite(self, ctx, code: int, nickname = None, username_discriminator = None, ):
+async def googlesheetswrite(self, ctx, code: int, nickname = None, username_discriminator = None):
     if type(code) is not int:
         await ctx.send(f'Error in function `googlesheetswrite`\nCode is type `{type(code)}`')
     # Google
