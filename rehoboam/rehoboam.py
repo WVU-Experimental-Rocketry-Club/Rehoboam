@@ -627,6 +627,10 @@ class Rehoboam(commands.Cog):
                 await clearindex(self, ctx)
                 return
 
+        await ctx.send(duesListFlat[rowIndex-1])
+        await ctx.send(duesListFlat[rowIndex])
+        await ctx.send(duesListFlat[rowIndex+1])
+        await ctx.send(rowIndex)
         # Paid Dues Not Verified. Code 2
         if duesListFlat[rowIndex].lower() == 'true' and verListFlat[rowIndex].lower() == 'false':
             # Write to sheet
@@ -748,7 +752,7 @@ class Rehoboam(commands.Cog):
 
             if (datetime.now(timezone.utc) - timedelta(seconds=10)) <= (datetime.fromisoformat(event_start) - timedelta(hours=1)) <= (datetime.now(timezone.utc) + timedelta(seconds=10)):
                 try:
-                    await eventschannel.send(f"{scheduled_event.url}\nEvent starts in 1 hour.")
+                    await eventschannel.send(f"Event starts in 1 hour.\n{scheduled_event.url}")
                 except (discord.errors.Forbidden, discord.errors.NotFound):
                     to_remove.append(event)
                 except discord.errors.HTTPException:
@@ -801,7 +805,7 @@ async def googlesheetsfetch(self, ctx, mixEmail):
         # Check if User Message is in Sheets Email List
         if [email for email in emailsListFlat if email in mixEmail]:
             # Get Sheets Dues Cell and Verified Cell from Emails List Index
-            rowIndex = emailsListFlat.index(mixEmail[0]) + 1
+            rowIndex = emailsListFlat.index(mixEmail[0])
             emailIndexInit = emailsList.index(mixEmail)
             emailIndex = emailIndexInit + 2
 
@@ -935,7 +939,7 @@ async def googlesheetsfetch(self, ctx, mixEmail):
             # Check if User Message is in Sheets Email List
             if [email for email in emailsListFlat if email in mixEmail]:
                 # Get Sheets Dues Cell and Verified Cell from Emails List Index
-                rowIndex = emailsListFlat.index(mixEmail[0]) + 1
+                rowIndex = emailsListFlat.index(mixEmail[0])
                 emailIndexInit = emailsList.index(mixEmail)
                 emailIndex = emailIndexInit + 2
 
