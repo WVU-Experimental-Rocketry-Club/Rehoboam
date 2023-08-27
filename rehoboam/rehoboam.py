@@ -15,6 +15,7 @@ from datetime import datetime, date, timezone, timedelta
 from discord.ext import tasks
 from oauth2client.service_account import ServiceAccountCredentials
 from redbot.core import checks, commands, Config
+from redbot.core.utils.chat_formatting import humanize_timedelta
 from typing import Union
 from .dataIO import dataIO
 
@@ -589,7 +590,7 @@ class Rehoboam(commands.Cog):
 
                 # Log to Verification Log
                 await log_channel.send(
-                    f'{ctx.author.mention} has verified alumni status with the email `{mix_email}`.'
+                    f'{ctx.author.mention} has verified alumni status with the email `{mix_email.lower()}`.'
                 )
 
                 if time_lastupdate != 0:
@@ -660,7 +661,7 @@ class Rehoboam(commands.Cog):
 
             # Log to Verification Log
             await log_channel.send(
-                f'{ctx.author.mention} has verified dues with the email `{mix_email}`.'
+                f'{ctx.author.mention} has verified dues with the email `{mix_email.lower()}`.'
             )
 
             if time_lastupdate != 0:
@@ -717,6 +718,63 @@ class Rehoboam(commands.Cog):
             await clearindex(self, ctx)
             return
 
+    @commands.guild_only()
+    @checks.admin_or_permissions(manage_events=True)
+    @commands.command(name="eventalert")
+    async def event_alert(self, ctx, eventid: int, true_false: str, hours: int = 1):
+        """
+        Sets the alert details for a scheduled event
+        `<ID>` event ID
+        `<toggle>` alert status. true or false
+        `[hours]` number of hours before start to alert. default is 1
+        """
+        if type(eventid) is not int:
+            await ctx.send("Event ID must be an integer")
+            return
+        if type(true_false) is not str:
+            await ctx.send("Event toggle must be either `true` or `false`")
+            return
+        if true_false.lower() != "true" and true_false.lower() != "false":
+            await ctx.send("Event toggle must be either `true` or `false`")
+            return
+        if type(hours) is not int:
+            await ctx.send("Hours must be an integer")
+            return
+
+        if eventid not in [event["ID"] for event in self.events]:
+            await ctx.send(f"Could not find event with ID `{eventid}`")
+
+        if true_false.lower() == "false":
+            for event in self.events:
+                if event["ID"] == eventid:
+                    try:
+                        event["ALERT"] = "FALSE"
+                        try:
+                            dataIO.save_json("data/scheduled_events/scheduled_events.json", self.events)
+                            await ctx.send(f"Alert disabled for event with ID `{eventid}`")
+                        except:
+                            logger.info("Could not save events JSON")
+                            await ctx.send("`Error. Check your console or logs for details`")
+                    except:
+                        await ctx.send(f"Could not find event with ID `{eventid}`")
+
+        if true_false.lower() == "true":
+            for event in self.events:
+                if event["ID"] == eventid:
+                    try:
+                        event["ALERT"] = "TRUE"
+                        event["BEFORE"] = hours
+                        delta = timedelta(hours=hours)
+                        time_str = humanize_timedelta(timedelta=delta)
+                        try:
+                            dataIO.save_json("data/scheduled_events/scheduled_events.json", self.events)
+                            await ctx.send(f"Alert enabled for event with ID `{eventid}`. Set to {time_str} before start.")
+                        except:
+                            logger.info("Could not save events JSON")
+                            await ctx.send("`Error. Check your console or logs for details`")
+                    except:
+                        await ctx.send(f"Could not find event with ID `{eventid}`")
+
     @commands.Cog.listener()
     async def on_scheduled_event_create(self, ctx):
         events_id = await self.config.guild(ctx.guild).events_channel()
@@ -725,42 +783,98 @@ class Rehoboam(commands.Cog):
             event_url = ctx.url
             event_start = ctx.start_time.isoformat()
 
-            self.events.append({"GUILD": ctx.guild.id,"ID": ctx.id, "START": event_start})
+            self.events.append({"GUILD": ctx.guild.id,"ID": ctx.id,"START": event_start,"ALERT": "TRUE","BEFORE": 1})
 
             logger.info("New scheduled event ({}) created in {}.".format(ctx.id, ctx.guild.name))
             dataIO.save_json("data/scheduled_events/scheduled_events.json", self.events)
 
             await eventschannel.send(event_url)
-
         else:
             return
 
+    @commands.Cog.listener()
+    async def on_scheduled_event_update(self, before, after):
+        events_id = await self.config.guild(after.guild).events_channel()
+        if events_id is None:
+            return
+        if after.id not in [event["ID"] for event in self.events]:
+            try:
+                self.events.append({"GUILD": after.guild.id, "ID": after.id, "START": after.start_time.isoformat()})
+                try:
+                    logger.info("New scheduled event ({}) created in {}.".format(after.id, after.guild.name))
+                    dataIO.save_json("data/scheduled_events/scheduled_events.json", self.events)
+                except:
+                    logger.info("Could not save events JSON")
+            except:
+                logger.info(f"Could not add event {after.id}")
+        elif before.start_time == after.start_time:
+            return
+        else:
+            for event in self.events:
+                if event["ID"] == after.id and event["START"] != after.start_time.isoformat():
+                    try:
+                        event["START"] = after.start_time.isoformat()
+                        try:
+                            dataIO.save_json("data/scheduled_events/scheduled_events.json", self.events)
+                        except:
+                            logger.info("Could not save events JSON")
+                    except:
+                        logger.info(f"Could not modify start time for event {after.id}")
+
     @tasks.loop(seconds=5)
     async def check_events(self):
+        global to_remove
+        global to_alert
         to_remove = []
+        to_alert = []
+
         for event in self.events:
+            try:
+                event_alert = event["ALERT"]
+            except:
+                event_alert = "TRUE"
+            try:
+                event_before = event["BEFORE"]
+            except:
+                event_before = 1
+            event_start = event["START"]
+            if event_alert == "TRUE":
+                if (datetime.now(timezone.utc) - timedelta(seconds=10)) <= (datetime.fromisoformat(event_start) - timedelta(hours=event_before)) <= (datetime.now(timezone.utc) + timedelta(seconds=10)):
+                    to_alert.append(event)
+            if (datetime.fromisoformat(event_start) - timedelta(hours=event_before)) <= (datetime.now(timezone.utc) - timedelta(seconds=10)):
+                to_remove.append(event)
+
+        for event in to_alert:
             guild = self.bot.get_guild(event["GUILD"])
             scheduled_event_id = event["ID"]
-            event_start = event["START"]
+            before_alert = event["BEFORE"]
             events_id = await self.config.guild(guild).events_channel()
             eventschannel = guild.get_channel(events_id)
             scheduled_event = guild.get_scheduled_event(scheduled_event_id)
 
-            if (datetime.now(timezone.utc) - timedelta(seconds=10)) <= (datetime.fromisoformat(event_start) - timedelta(hours=1)) <= (datetime.now(timezone.utc) + timedelta(seconds=10)):
-                try:
-                    await eventschannel.send(f"Event starts in 1 hour.\n{scheduled_event.url}")
-                except (discord.errors.Forbidden, discord.errors.NotFound):
-                    to_remove.append(event)
-                except discord.errors.HTTPException:
-                    pass
-                else:
-                    to_remove.append(event)
-            if (datetime.fromisoformat(event_start) - timedelta(hours=1)) <= (datetime.now(timezone.utc) - timedelta(seconds=10)):
+            delta = timedelta(hours=before_alert)
+            time_str = humanize_timedelta(timedelta=delta)
+
+            try:
+                await eventschannel.send(f"Event starts in {time_str}.\n{scheduled_event.url}")
+            except (discord.errors.Forbidden, discord.errors.NotFound):
                 to_remove.append(event)
+            except discord.errors.HTTPException:
+                pass
+            else:
+                to_remove.append(event)
+
         for event in to_remove:
-            self.events.remove(event)
+            try:
+                self.events.remove(event)
+            except:
+                logger.info(f"Could not remove event {event['ID']}")
+
         if to_remove:
-            dataIO.save_json("data/scheduled_events/scheduled_events.json", self.events)
+            try:
+                dataIO.save_json("data/scheduled_events/scheduled_events.json", self.events)
+            except:
+                logger.info("Could not save events JSON")
 
     @check_events.before_loop
     async def before_task(self):
@@ -959,8 +1073,8 @@ async def googlesheetsfetch(self, ctx, mixEmail):
                 # If OS is Windows
                 await adminchannel.send(
                     time.strftime(f"""
-                                `Sheets data successfully retrieved at %#I:%M:%S %p.\nFetch {counter}\n`
-                                """)
+                    `Sheets data successfully retrieved at %#I:%M:%S %p.\nFetch {counter}\n`
+                    """)
                 )
             await self.config.guild(ctx.guild).sheet_update_count.set(counter)
             await self.config.guild(ctx.guild).time_lastupdate.set(time.time())
