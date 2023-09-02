@@ -33,6 +33,7 @@ class Rehoboam(commands.Cog):
         self.config = Config.get_conf(self, 9738629561, force_registration=True)
         self.events = dataIO.load_json("data/scheduled_events/scheduled_events.json")
         self.check_events.start()
+        self.check_slcf_stock.start()
 
         default_guild = {
             "guild_id": None,
@@ -66,7 +67,8 @@ class Rehoboam(commands.Cog):
             "emailIndex": None,
             "roleMember": None,
             "roleUnpaid": None,
-            "roleAlum": None
+            "roleAlum": None,
+            "roleAnnouncements": None
         }
 
         self.config.register_guild(**default_guild)
@@ -163,8 +165,8 @@ class Rehoboam(commands.Cog):
             "The events channel has been cleared. Automated scheduled events posts are now disabled."
         )
 
-    @serverconfig.command(name="roles")
-    async def roles_set(
+    @serverconfig.command(name="duesroles")
+    async def duesroles_set(
             self, ctx, member: discord.Role = None, unpaid: discord.Role = None, alum: discord.Role = None):
         """
         Sets the roles which the bot will use for verification
@@ -180,17 +182,32 @@ class Rehoboam(commands.Cog):
             return
         if alum == None:
             await ctx.send(
-                f"Server roles have been set.\n```Member: {member.mention}\nUnpaid Dues: {unpaid.mention}```"
+                f"Server roles have been set.\n```Member: {member.id}\nUnpaid Dues: {unpaid.id}```"
             )
             await self.config.guild(ctx.guild).roleMember.set(member.id)
             await self.config.guild(ctx.guild).roleUnpaid.set(unpaid.id)
             return
         await ctx.send(
-            f"Server roles have been set.\n```Member: {member.mention}\nUnpaid Dues: {unpaid.mention}\nAlumnus: {alum.mention}```"
+            f"Server roles have been set.\n```Member: {member.id}\nUnpaid Dues: {unpaid.id}\nAlumnus: {alum.id}```"
         )
         await self.config.guild(ctx.guild).roleMember.set(member.id)
         await self.config.guild(ctx.guild).roleUnpaid.set(unpaid.id)
         await self.config.guild(ctx.guild).roleAlum.set(alum.id)
+
+    @serverconfig.command(name="announcerole")
+    async def announceroles_set(
+            self, ctx, announcements: discord.Role):
+        """
+        Sets the role which the bot will mention for announcements
+        `<announcements>` announcements role
+        """
+        if type(announcements) is not discord.Role:
+            await ctx.send("Role must be a valid discord role")
+            return
+        await ctx.send(
+            f"Announcements role has been set.\n```Announcements: {announcements.id}```"
+        )
+        await self.config.guild(ctx.guild).roleAnnouncements.set(announcements.id)
 
     @commands.group(autohelp=True)
     @commands.guild_only()
@@ -876,8 +893,66 @@ class Rehoboam(commands.Cog):
             except:
                 logger.info("Could not save events JSON")
 
+    @tasks.loop(seconds=15)
+    async def check_slcf_stock(self):
+        """Task to check if SLCF is in stock.  Active while SLCF is OUT of stock, sending a message once it becomes IN
+        stock """
+
+        url = 'https://www.perfectflitedirect.com/stratologgercf-altimeter/'
+        slcf_obj = requests.get(url)
+
+        if 'Out of Stock' not in slcf_obj.text and '<div class="Label QuantityInput" style="display: ">Quantity:</div>' in slcf_obj.text:
+            rocketry_id = 972627157513797643
+            rocketry_guild = await self.bot.get_guild(rocketry_id)
+            channel = await self.config.guild(rocketry_guild).events_channel()
+            announce_id = await self.bot.guild(rocketry_guild).roleAnnouncements()
+
+            if announce_id is not None:
+                announce_role = await self.bot.guild(rocketry_guild).get_role(announce_id)
+                message = f"{announce_role.mention}\nStratoLogger CF is back in stock!\nhttps://www.perfectflitedirect.com/stratologgercf-altimeter/"
+
+                # Send message, start the out of stock task, cancel this task
+                await channel.send(message)
+                self.check_slcf_oostock.start()
+                self.check_slcf_stock.cancel()
+
+            else:
+                message = f"StratoLogger CF is back in stock!\nhttps://www.perfectflitedirect.com/stratologgercf-altimeter/"
+
+                # Send message, start the out of stock task, cancel this task
+                await channel.send(message)
+                self.check_slcf_oostock.start()
+                self.check_slcf_stock.cancel()
+
+    @tasks.loop(seconds=15)
+    async def check_slcf_oostock(self):
+        """Task to check if SLCF is out of stock.  Active while SLCF is IN stock, sending a message once it becomes OUT
+        of stock """
+        url = 'https://www.perfectflitedirect.com/stratologgercf-altimeter/'
+        slcf_obj = requests.get(url)
+
+        with open('test.html') as f:
+            lines = f.readlines()
+            f.close()
+
+        if 'Out of Stock' in slcf_obj.text:
+            rocketry_id = 972627157513797643
+            rocketry_guild = await self.bot.get_guild(rocketry_id)
+            channel = await self.config.guild(rocketry_guild).events_channel()
+
+            message = "\nStratoLogger CF is out of stock.\nI will notify when it is back in stock."
+
+            # Send message, start the out of stock task, cancel this task
+            await channel.send(message)
+            self.check_slcf_stock.cancel()
+            self.check_slcf_oostock.start()
+
     @check_events.before_loop
     async def before_task(self):
+        await self.bot.wait_until_ready()
+
+    @check_slcf_stock.before_loop
+    async def before_task2(self):
         await self.bot.wait_until_ready()
 
 def check_folders():
