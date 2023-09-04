@@ -1,11 +1,11 @@
 import asyncio
+import aiohttp
 import discord
 import gspread
 import itertools
 import json
 import pytz
 import re
-import requests
 import time
 import calendar
 import os
@@ -23,10 +23,6 @@ logger = logging.getLogger("red.rehoboam")
 
 class Rehoboam(commands.Cog):
     """Migrates Rocketry Bot functions to Red cog"""
-
-    async def red_delete_data_for_user(self, **kwargs):
-        """ Nothing to delete """
-        return
 
     def __init__(self, bot):
         self.bot = bot
@@ -787,7 +783,7 @@ class Rehoboam(commands.Cog):
                         getevent = ctx.guild.get_scheduled_event(eventid)
                         try:
                             dataIO.save_json("data/scheduled_events/scheduled_events.json", self.events)
-                            await ctx.send(f"Alert enabled for event `{getevent.name}` with ID `{eventid}`. Set to {time_str} before start.")
+                            await ctx.send(f"Alert enabled for event `{getevent.name}` with ID `{eventid}`.\nSet to {time_str} before start.")
                         except:
                             logger.info("Could not save events JSON")
                             await ctx.send("`Error. Check your console or logs for details`")
@@ -901,53 +897,49 @@ class Rehoboam(commands.Cog):
         stock """
 
         url = 'https://www.perfectflitedirect.com/stratologgercf-altimeter/'
-        slcf_obj = requests.get(url)
+        async with aiohttp.ClientSession() as session:
+            async with session.get(url) as slcf_obj:
+                if 'Out of Stock' not in slcf_obj.text and '<div class="Label QuantityInput" style="display: ">Quantity:</div>' in slcf_obj.text:
+                    rocketry_id = 972627157513797643
+                    rocketry_guild = await self.bot.get_guild(rocketry_id)
+                    channel = await self.config.guild(rocketry_guild).events_channel()
+                    announce_id = await self.bot.guild(rocketry_guild).roleAnnouncements()
 
-        if 'Out of Stock' not in slcf_obj.text and '<div class="Label QuantityInput" style="display: ">Quantity:</div>' in slcf_obj.text:
-            rocketry_id = 972627157513797643
-            rocketry_guild = await self.bot.get_guild(rocketry_id)
-            channel = await self.config.guild(rocketry_guild).events_channel()
-            announce_id = await self.bot.guild(rocketry_guild).roleAnnouncements()
+                    if announce_id is not None:
+                        announce_role = await self.bot.guild(rocketry_guild).get_role(announce_id)
+                        message = f"{announce_role.mention}\nStratoLogger CF is back in stock!\nhttps://www.perfectflitedirect.com/stratologgercf-altimeter/"
 
-            if announce_id is not None:
-                announce_role = await self.bot.guild(rocketry_guild).get_role(announce_id)
-                message = f"{announce_role.mention}\nStratoLogger CF is back in stock!\nhttps://www.perfectflitedirect.com/stratologgercf-altimeter/"
+                        # Send message, start the out of stock task, cancel this task
+                        await channel.send(message)
+                        self.check_slcf_oostock.start()
+                        self.check_slcf_stock.cancel()
 
-                # Send message, start the out of stock task, cancel this task
-                await channel.send(message)
-                self.check_slcf_oostock.start()
-                self.check_slcf_stock.cancel()
+                    else:
+                        message = f"StratoLogger CF is back in stock!\nhttps://www.perfectflitedirect.com/stratologgercf-altimeter/"
 
-            else:
-                message = f"StratoLogger CF is back in stock!\nhttps://www.perfectflitedirect.com/stratologgercf-altimeter/"
-
-                # Send message, start the out of stock task, cancel this task
-                await channel.send(message)
-                self.check_slcf_oostock.start()
-                self.check_slcf_stock.cancel()
+                        # Send message, start the out of stock task, cancel this task
+                        await channel.send(message)
+                        self.check_slcf_oostock.start()
+                        self.check_slcf_stock.cancel()
 
     @tasks.loop(seconds=15)
     async def check_slcf_oostock(self):
         """Task to check if SLCF is out of stock.  Active while SLCF is IN stock, sending a message once it becomes OUT
         of stock """
         url = 'https://www.perfectflitedirect.com/stratologgercf-altimeter/'
-        slcf_obj = requests.get(url)
+        async with aiohttp.ClientSession() as session:
+            async with session.get(url) as slcf_obj:
+                if 'Out of Stock' in slcf_obj.text:
+                    rocketry_id = 972627157513797643
+                    rocketry_guild = await self.bot.get_guild(rocketry_id)
+                    channel = await self.config.guild(rocketry_guild).events_channel()
 
-        with open('test.html') as f:
-            lines = f.readlines()
-            f.close()
+                    message = "\nStratoLogger CF is out of stock.\nI will notify when it is back in stock."
 
-        if 'Out of Stock' in slcf_obj.text:
-            rocketry_id = 972627157513797643
-            rocketry_guild = await self.bot.get_guild(rocketry_id)
-            channel = await self.config.guild(rocketry_guild).events_channel()
-
-            message = "\nStratoLogger CF is out of stock.\nI will notify when it is back in stock."
-
-            # Send message, start the out of stock task, cancel this task
-            await channel.send(message)
-            self.check_slcf_stock.cancel()
-            self.check_slcf_oostock.start()
+                    # Send message, start the out of stock task, cancel this task
+                    await channel.send(message)
+                    self.check_slcf_stock.cancel()
+                    self.check_slcf_oostock.start()
 
     @check_events.before_loop
     async def before_task(self):
