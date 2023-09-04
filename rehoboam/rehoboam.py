@@ -766,9 +766,10 @@ class Rehoboam(commands.Cog):
                 if event["ID"] == eventid:
                     try:
                         event["ALERT"] = "FALSE"
+                        getevent = await self.ctx.guild.get_scheduled_event(eventid)
                         try:
                             dataIO.save_json("data/scheduled_events/scheduled_events.json", self.events)
-                            await ctx.send(f"Alert disabled for event with ID `{eventid}`")
+                            await ctx.send(f"Alert disabled for event `{getevent.name}` with ID `{eventid}`")
                         except:
                             logger.info("Could not save events JSON")
                             await ctx.send("`Error. Check your console or logs for details`")
@@ -783,9 +784,10 @@ class Rehoboam(commands.Cog):
                         event["BEFORE"] = hours
                         delta = timedelta(hours=hours)
                         time_str = humanize_timedelta(timedelta=delta)
+                        getevent = await self.ctx.guild.get_scheduled_event(eventid)
                         try:
                             dataIO.save_json("data/scheduled_events/scheduled_events.json", self.events)
-                            await ctx.send(f"Alert enabled for event with ID `{eventid}`. Set to {time_str} before start.")
+                            await ctx.send(f"Alert enabled for event `{getevent.name}` with ID `{eventid}`. Set to {time_str} before start.")
                         except:
                             logger.info("Could not save events JSON")
                             await ctx.send("`Error. Check your console or logs for details`")
