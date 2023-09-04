@@ -766,7 +766,7 @@ class Rehoboam(commands.Cog):
                 if event["ID"] == eventid:
                     try:
                         event["ALERT"] = "FALSE"
-                        getevent = await self.ctx.guild.get_scheduled_event(eventid)
+                        getevent = await ctx.guild.get_scheduled_event(eventid)
                         try:
                             dataIO.save_json("data/scheduled_events/scheduled_events.json", self.events)
                             await ctx.send(f"Alert disabled for event `{getevent.name}` with ID `{eventid}`")
@@ -784,7 +784,7 @@ class Rehoboam(commands.Cog):
                         event["BEFORE"] = hours
                         delta = timedelta(hours=hours)
                         time_str = humanize_timedelta(timedelta=delta)
-                        getevent = await self.ctx.guild.get_scheduled_event(eventid)
+                        getevent = await ctx.guild.get_scheduled_event(eventid)
                         try:
                             dataIO.save_json("data/scheduled_events/scheduled_events.json", self.events)
                             await ctx.send(f"Alert enabled for event `{getevent.name}` with ID `{eventid}`. Set to {time_str} before start.")
