@@ -899,7 +899,8 @@ class Rehoboam(commands.Cog):
         url = 'https://www.perfectflitedirect.com/stratologgercf-altimeter/'
         async with aiohttp.ClientSession() as session:
             async with session.get(url) as slcf_obj:
-                if 'Out of Stock' not in slcf_obj.text() and '<div class="Label QuantityInput" style="display: ">Quantity:</div>' in slcf_obj.text():
+                response = await slcf_obj.text()
+                if 'Out of Stock' not in response and '<div class="Label QuantityInput" style="display: ">Quantity:</div>' in response:
                     rocketry_id = 972627157513797643
                     rocketry_guild = await self.bot.get_guild(rocketry_id)
                     channel = await self.config.guild(rocketry_guild).events_channel()
@@ -929,7 +930,8 @@ class Rehoboam(commands.Cog):
         url = 'https://www.perfectflitedirect.com/stratologgercf-altimeter/'
         async with aiohttp.ClientSession() as session:
             async with session.get(url) as slcf_obj:
-                if 'Out of Stock' in slcf_obj.text():
+                response = await slcf_obj.text()
+                if 'Out of Stock' in response:
                     rocketry_id = 972627157513797643
                     rocketry_guild = await self.bot.get_guild(rocketry_id)
                     channel = await self.config.guild(rocketry_guild).events_channel()
