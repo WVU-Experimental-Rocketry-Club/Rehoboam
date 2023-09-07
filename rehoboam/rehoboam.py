@@ -767,7 +767,6 @@ class Rehoboam(commands.Cog):
                             dataIO.save_json("data/scheduled_events/scheduled_events.json", self.events)
                             await ctx.send(f"Alert disabled for event `{getevent.name}` with ID `{eventid}`")
                         except:
-                            logger.info("Could not save events JSON")
                             await ctx.send("`Error. Check your console or logs for details`")
                     except:
                         await ctx.send(f"Could not find event with ID `{eventid}`")
@@ -782,10 +781,22 @@ class Rehoboam(commands.Cog):
                         time_str = humanize_timedelta(timedelta=delta)
                         getevent = ctx.guild.get_scheduled_event(eventid)
                         try:
-                            dataIO.save_json("data/scheduled_events/scheduled_events.json", self.events)
-                            await ctx.send(f"Alert enabled for event `{getevent.name}` with ID `{eventid}`.\nSet to {time_str} before start.")
-                        except:
-                            logger.info("Could not save events JSON")
+                            # If Windows
+                            try:
+                                dataIO.save_json("data/scheduled_events/scheduled_events.json", self.events)
+                                eventtime_string = getevent.start_time.strftime("`%A, %B %-d` at `%-I:%M %p`")
+                                await ctx.send(
+                                    f"Alert enabled for event `{getevent.name}` with ID `{eventid}`.\nSet to {eventtime_string}. {time_str} before scheduled start."
+                                )
+                            # If MacOS or Linux
+                            except:
+                                dataIO.save_json("data/scheduled_events/scheduled_events.json", self.events)
+                                eventtime_string = getevent.start_time.strftime("`%A, %B %#d` at `%#I:%M %p`")
+                                await ctx.send(
+                                    f"Alert enabled for event `{getevent.name}` with ID `{eventid}`.\nSet to {eventtime_string}. {time_str} before scheduled start."
+                                )
+                        except Exception as e:
+                            logger.error(e)
                             await ctx.send("`Error. Check your console or logs for details`")
                     except:
                         await ctx.send(f"Could not find event with ID `{eventid}`")
