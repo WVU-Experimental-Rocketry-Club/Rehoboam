@@ -784,14 +784,14 @@ class Rehoboam(commands.Cog):
                             # If Windows
                             try:
                                 dataIO.save_json("data/scheduled_events/scheduled_events.json", self.events)
-                                eventtime_string = getevent.start_time.strftime("`%A, %B %-d` at `%-I:%M %p`")
+                                eventtime_string = getevent.start_time.astimezone().strftime("`%A, %B %-d` at `%-I:%M %p`")
                                 await ctx.send(
                                     f"Alert enabled for event `{getevent.name}` with ID `{eventid}`.\nSet to {eventtime_string}. {time_str} before scheduled start."
                                 )
                             # If MacOS or Linux
                             except:
                                 dataIO.save_json("data/scheduled_events/scheduled_events.json", self.events)
-                                eventtime_string = getevent.start_time.strftime("`%A, %B %#d` at `%#I:%M %p`")
+                                eventtime_string = getevent.start_time.astimezone().strftime("`%A, %B %#d` at `%#I:%M %p`")
                                 await ctx.send(
                                     f"Alert enabled for event `{getevent.name}` with ID `{eventid}`.\nSet to {eventtime_string}. {time_str} before scheduled start."
                                 )
