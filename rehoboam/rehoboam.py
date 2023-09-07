@@ -849,7 +849,7 @@ class Rehoboam(commands.Cog):
                     except:
                         logger.info(f"Could not modify start time for event {after.id}")
 
-    @tasks.loop(seconds=5)
+    @tasks.loop(seconds=10)
     async def check_events(self):
         global to_remove
         global to_alert
