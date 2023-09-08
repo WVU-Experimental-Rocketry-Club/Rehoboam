@@ -849,7 +849,7 @@ class Rehoboam(commands.Cog):
                     except:
                         logger.info(f"Could not modify start time for event {after.id}")
 
-    @tasks.loop(seconds=10)
+    @tasks.loop(seconds=15)
     async def check_events(self):
         global to_remove
         global to_alert
@@ -866,10 +866,13 @@ class Rehoboam(commands.Cog):
             except:
                 event_before = 1
             event_start = event["START"]
+            event_start_datetime = datetime.fromisoformat(event_start)
+            now = datetime.now(timezone.utc)
+            check_delta = timedelta(seconds=10)
             if event_alert == "TRUE":
-                if (datetime.now(timezone.utc) - timedelta(seconds=10)) <= (datetime.fromisoformat(event_start) - timedelta(hours=event_before)) <= (datetime.now(timezone.utc) + timedelta(seconds=10)):
+                if (now - check_delta) <= (event_start_datetime - timedelta(hours=event_before)) <= (now + check_delta):
                     to_alert.append(event)
-            if (datetime.fromisoformat(event_start) - timedelta(hours=event_before)) <= (datetime.now(timezone.utc) - timedelta(seconds=10)):
+            if (event_start_datetime - timedelta(hours=event_before)) <= (now - check_delta):
                 to_remove.append(event)
 
         for event in to_alert:
