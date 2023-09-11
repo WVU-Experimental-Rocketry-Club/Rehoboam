@@ -4,6 +4,6 @@
     "install_msg": "Thanks for installing, have a blast.",
     "short": "WVUER and ARC server commands",
     "tags": ["WVU"],
-    "requirements": ["gspread","requests","oauth2client","pytz"],
+    "requirements": ["gspread","requests","oauth2client","pytz","phonemizer"],
     "type": "COG"
 }

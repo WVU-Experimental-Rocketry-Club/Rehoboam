@@ -18,6 +18,7 @@ from redbot.core import checks, commands, Config
 from redbot.core.utils.chat_formatting import humanize_timedelta
 from typing import Union
 from .dataIO import dataIO
+from .phonemes import make_phrase, replace_ipa, tied, make_digraph, split, process_text
 
 logger = logging.getLogger("red.rehoboam")
 
@@ -732,6 +733,32 @@ class Rehoboam(commands.Cog):
             return
 
     @commands.guild_only()
+    @commands.command(name="phonemize")
+    async def phonemize_text(self, ctx, *, word_or_phrase):
+        if len(word_or_phrase) > 500:
+            await ctx.send("Message must be shorter than 500 characters")
+            return
+        values = replace_ipa(tied(make_digraph(split(process_text(word_or_phrase)))))
+        phrase = make_phrase(values[0])
+        async with ctx.channel.typing():
+            await asyncio.sleep(.25)
+        await ctx.reply(phrase)
+
+    @commands.guild_only()
+    @commands.command(name="phonemize-show")
+    async def phonemize_show(self, ctx, word):
+        if len(word) > 500:
+            await ctx.send("Message must be shorter than 500 characters")
+            return
+        values = replace_ipa(tied(make_digraph(split(process_text(word)))))
+        phrase = make_phrase(values[0])
+        phoneme_links = values[1]
+        response = f"{phrase}\n```{phoneme_links}```"
+        async with ctx.channel.typing():
+            await asyncio.sleep(.25)
+        await ctx.reply(response)
+
+    @commands.guild_only()
     @checks.admin_or_permissions(manage_events=True)
     @commands.command(name="eventalert")
     async def event_alert(self, ctx, eventid: int, true_false: str, hours: int = 1):
@@ -918,12 +945,13 @@ class Rehoboam(commands.Cog):
                 response = await slcf_obj.text()
                 if 'Out of Stock' not in response and '<div class="Label QuantityInput" style="display: ">Quantity:</div>' in response:
                     rocketry_id = 972627157513797643
-                    rocketry_guild = await self.bot.get_guild(rocketry_id)
-                    channel = await self.config.guild(rocketry_guild).events_channel()
-                    announce_id = await self.bot.guild(rocketry_guild).roleAnnouncements()
+                    rocketry_guild = self.bot.get_guild(rocketry_id)
+                    channel_id = await self.config.guild(rocketry_guild).events_channel()
+                    channel = rocketry_guild.get_channel(channel_id)
+                    announce_id = await self.config.guild(rocketry_guild).roleAnnouncements()
 
                     if announce_id is not None:
-                        announce_role = await self.bot.guild(rocketry_guild).get_role(announce_id)
+                        announce_role = rocketry_guild.get_role(announce_id)
                         message = f"{announce_role.mention}\nStratoLogger CF is back in stock!\nhttps://www.perfectflitedirect.com/stratologgercf-altimeter/"
 
                         # Send message, start the out of stock task, cancel this task
@@ -949,8 +977,9 @@ class Rehoboam(commands.Cog):
                 response = await slcf_obj.text()
                 if 'Out of Stock' in response:
                     rocketry_id = 972627157513797643
-                    rocketry_guild = await self.bot.get_guild(rocketry_id)
-                    channel = await self.config.guild(rocketry_guild).events_channel()
+                    rocketry_guild = self.bot.get_guild(rocketry_id)
+                    channel_id = await self.config.guild(rocketry_guild).events_channel()
+                    channel = rocketry_guild.get_channel(channel_id)
 
                     message = "\nStratoLogger CF is out of stock.\nI will notify when it is back in stock."
 
