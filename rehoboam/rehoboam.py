@@ -35,6 +35,7 @@ class Rehoboam(commands.Cog):
         default_guild = {
             "guild_id": None,
             "admin_channel": None,
+            "mod_channel": None,
             "dues_channel": None,
             "dues_log_channel": None,
             "events_channel": None,
@@ -71,6 +72,12 @@ class Rehoboam(commands.Cog):
         self.config.register_guild(**default_guild)
         self._ready: asyncio.Event = asyncio.Event()
 
+    def cog_unload(self):
+        if self.check_events:
+            self.check_events.cancel()
+            self.check_slcf_stock.cancel()
+            self.check_slcf_oostock.cancel()
+
     @commands.group(autohelp=True)
     @commands.guild_only()
     @checks.admin_or_permissions(manage_guild=True)
@@ -100,6 +107,28 @@ class Rehoboam(commands.Cog):
         await self.config.guild(ctx.guild).admin_channel.clear()
         await ctx.send(
             "The admin command channel has been cleared"
+        )
+
+    @serverconfig.command(name="modchannel")
+    async def modset_channel(
+            self, ctx, *, channel: Union[discord.TextChannel, discord.VoiceChannel]):
+        """
+        Changes the channel from which the bot will accept mod commands
+        `<channel>` the channel to be used
+        """
+        await self.config.guild(ctx.guild).mod_channel.set(channel.id)
+        await ctx.send(
+            ("The mod channel has been set to {channel.mention}").format(channel=channel)
+        )
+
+    @serverconfig.command(name="clearmodchannel")
+    async def modset_clear_channel(self, ctx):
+        """
+        Clears the channel for moderator commands
+        """
+        await self.config.guild(ctx.guild).mod_channel.clear()
+        await ctx.send(
+            "The mod command channel has been cleared"
         )
 
     @serverconfig.command(name="dueschannel")
@@ -417,25 +446,6 @@ class Rehoboam(commands.Cog):
             "The worksheet name has been cleared. Dues verification is now disabled."
         )
 
-    @sheetsconfig.command(name="updatefreq")
-    async def freqset(self, ctx, seconds: int):
-        """
-        Sets the Google Sheets data retrieval frequency.
-        `<seconds>` the interval at which new sheets data will be retrieved in seconds
-        """
-        await self.config.guild(ctx.guild).sheetupdatefreq.set(seconds)
-        await ctx.send(f"The data retrieval frequency has been set to {seconds} seconds")
-
-    @sheetsconfig.command(name="clearupdatefreq")
-    async def freq_clear(self, ctx):
-        """
-        Resets the Google Sheets data retrieval frequency. Default is 0 seconds. New data will be retrieved on every use of [p]verify.
-        """
-        await self.config.guild(ctx.guild).sheetupdatefreq.clear()
-        await ctx.send(
-            "The data retrieval frequency has been reset."
-        )
-
     @checks.mod_or_permissions(administrator=True)
     @commands.command()
     @commands.guild_only()
@@ -496,7 +506,7 @@ class Rehoboam(commands.Cog):
         """
         Verify club dues or alumni status for access to members-only channels.
         `<mix email>` Your full WVU mix email.
-        `<alum>` If verifying alum status, write "alum". Otherwise, leave blank
+        `[alum]` If verifying alum status, write "alum". Otherwise, leave blank
         """
         # Declare vars as global
         global emailsListFlat
@@ -511,21 +521,21 @@ class Rehoboam(commands.Cog):
         dues_id = await self.config.guild(ctx.guild).dues_channel()
         dues_channel = ctx.guild.get_channel(dues_id)
 
-        admin_id = await self.config.guild(ctx.guild).admin_channel()
-        adminchannel = ctx.guild.get_channel(admin_id)
+        mod_id = await self.config.guild(ctx.guild).mod_channel()
+        modchannel = ctx.guild.get_channel(mod_id)
 
         log_id = await self.config.guild(ctx.guild).dues_log_channel()
         log_channel = ctx.guild.get_channel(log_id)
 
         # Check channels
-        if admin_id is None:
+        if mod_id is None:
             await ctx.reply("""
-                        `The channel for admin commands is not set. Use '[p]serverconfig adminchannel' command to set the channel. Disregard this message if you are not a server admin`
+                        `The channel for moderator commands is not set. Use '[p]serverconfig modchannel' command to set the channel. Disregard this message if you are not a server moderator`
                         """)
             return
 
         if dues_channel is None:
-            await adminchannel.send("""
+            await modchannel.send("""
             `The channel for dues verification is not set. Use '[p]serverconfig dueschannel' command to set the channel`
             """)
             return
@@ -735,6 +745,10 @@ class Rehoboam(commands.Cog):
     @commands.guild_only()
     @commands.command(name="phonemize")
     async def phonemize_text(self, ctx, *, word_or_phrase):
+        """
+        Generate alternative spellings of words and phrases using spellings already found in english.
+        `<word_or_phrase>` The text for which you would like to generate alternative spellings
+        """
         if len(word_or_phrase) > 500:
             await ctx.send("Message must be shorter than 500 characters")
             return
@@ -747,6 +761,12 @@ class Rehoboam(commands.Cog):
     @commands.guild_only()
     @commands.command(name="phonemize-show")
     async def phonemize_show(self, ctx, word):
+        """
+        Generate an alternative spelling of a word using spellings already found in english.
+        Similar to [p]phonemize, but displays what the bot did to generate the new spelling.
+        Only works on a **single** word
+        `<word>` The word for which you would like to generate an alternative spelling
+        """
         if len(word) > 500:
             await ctx.send("Message must be shorter than 500 characters")
             return
@@ -758,9 +778,16 @@ class Rehoboam(commands.Cog):
             await asyncio.sleep(.25)
         await ctx.reply(response)
 
+    @commands.group(autohelp=True)
     @commands.guild_only()
     @checks.admin_or_permissions(manage_events=True)
-    @commands.command(name="eventalert")
+    async def event(self, ctx):
+        """
+        Commands for server events
+        """
+        pass
+
+    @event.command(name="alert", aliases=["notify"])
     async def event_alert(self, ctx, eventid: int, true_false: str, hours: int = 1):
         """
         Sets the alert details for a scheduled event
@@ -829,6 +856,318 @@ class Rehoboam(commands.Cog):
                             await ctx.send("`Error. Check your console or logs for details`")
                     except:
                         await ctx.send(f"Could not find event with ID `{eventid}`")
+
+    @event.command(name="create", aliases=["make"])
+    async def make_event(self, ctx, *, eventname: str):
+        """
+        Creates a new scheduled event
+        `<name>` The name of the event
+        """
+        guild = ctx.guild
+        global name
+        name = eventname
+        global start_time
+        global end_time
+        global entity_type
+        global location
+        global event_channel
+        global description
+
+        timeoutmsg = f"I won't wait forever for a response.\nIf you decide you would like to create an event, use `{ctx.prefix}event create`."
+
+        # Event name
+        await ctx.send(f"Is `{name}` what you would like your event to be called?")
+        if name:
+            try:
+                m = await ctx.bot.wait_for(
+                    "message",
+                    check=lambda m: m.channel.id == ctx.channel.id
+                    and m.author.id == ctx.author.id,
+                    timeout=30,
+                )
+            except asyncio.TimeoutError:
+                await ctx.send(timeoutmsg)
+                return
+            else:
+                if (resp := m.content.casefold()) == "no":
+                    await ctx.send("What would you like your event to be called?")
+                    try:
+                        m = await ctx.bot.wait_for(
+                            "message",
+                            check=lambda m: m.channel.id == ctx.channel.id
+                                            and m.author.id == ctx.author.id,
+                            timeout=30,
+                        )
+                    except asyncio.TimeoutError:
+                        await ctx.send(timeoutmsg)
+                        return
+                    else:
+                        name = m.content
+                        await ctx.send(f"Event name will be `{name}`")
+                elif resp == "yes":
+                    pass
+                else:
+                    await ctx.send(timeoutmsg)
+                    return
+
+        # Event start time
+        await ctx.send("When will your event start?\n"
+                       "Response should be space-separated list using numbers for year, month, day. Time should be in 24-hour format.\n"
+                       "`Example: 2023 1 1 13 30`\n"
+                       "`Returns: January 1, 2023 at 1:30 PM EST`"
+                       )
+        try:
+            m = await ctx.bot.wait_for(
+                "message",
+                check=lambda m: m.channel.id == ctx.channel.id
+                                and m.author.id == ctx.author.id,
+                timeout=60,
+            )
+        except asyncio.TimeoutError:
+            await ctx.send(timeoutmsg)
+            return
+        else:
+            try:
+                # If OS is MacOS
+                resp = m.content
+                start_time = datetime.strptime(resp, '%Y %m %d %H %M')
+                start_time = start_time.astimezone()
+                await ctx.send(f"Event start will be `{start_time.strftime('%B %-d %Y at %-I:%M %p')}`")
+            except ValueError:
+                # If OS is Windows
+                resp = m.content
+                start_time = datetime.strptime(resp, '%Y %m %d %H %M')
+                start_time = start_time.astimezone()
+                await ctx.send(f"Event start will be `{start_time.strftime('%B %#d %Y at %#I:%M %p')}`")
+            except:
+                await ctx.send(f"Time formatting is incorrect please use `{ctx.prefix}event create` and try again.")
+                return
+
+        # Event end time
+        await ctx.send("When will your event end?")
+        try:
+            m = await ctx.bot.wait_for(
+                "message",
+                check=lambda m: m.channel.id == ctx.channel.id
+                                and m.author.id == ctx.author.id,
+                timeout=60,
+            )
+        except asyncio.TimeoutError:
+            await ctx.send(timeoutmsg)
+            return
+        else:
+            try:
+                # If OS is MacOS
+                resp = m.content
+                end_time = datetime.strptime(resp, '%Y %m %d %H %M')
+                end_time = end_time.astimezone()
+                await ctx.send(f"Event end will be `{end_time.strftime('%B %-d %Y at %-I:%M %p')}`")
+            except ValueError:
+                # If OS is Windows
+                resp = m.content
+                end_time = datetime.strptime(resp, '%Y %m %d %H %M')
+                end_time = end_time.astimezone()
+                await ctx.send(f"Event end will be `{end_time.strftime('%B %#d %Y at %#I:%M %p')}`")
+            except:
+                await ctx.send(f"Time formatting is incorrect please use `{ctx.prefix}event create` and try again.")
+                return
+
+        # Event location
+        entity_type = None
+        event_channel = None
+        location = None
+        await ctx.send("Where will your event take place?\n"
+                       "If it will be a VC event, reply with the channel ID.")
+        try:
+            m = await ctx.bot.wait_for(
+                "message",
+                check=lambda m: m.channel.id == ctx.channel.id
+                                and m.author.id == ctx.author.id,
+                timeout=60,
+            )
+        except asyncio.TimeoutError:
+            await ctx.send(timeoutmsg)
+            return
+        else:
+            if m.channel_mentions != []:
+                channel_id = m.channel_mentions[0].id
+                if ctx.guild.get_channel(channel_id).type != discord.ChannelType.voice:
+                    location = m.content
+                    entity_type = discord.EntityType.external
+                    await ctx.send(f"Event location will be `{location}`")
+                elif ctx.guild.get_channel_or_thread(channel_id).type:
+                    event_channel = ctx.guild.get_channel(channel_id)
+                    await ctx.send(f"Event location will be {event_channel.mention}")
+            elif len(m.content) == 18:
+                try:
+                    event_channel = ctx.guild.get_channel(int(m.content))
+                    await ctx.send(f"Event location will be {event_channel.mention}")
+                except ValueError:
+                    location = m.content
+                    entity_type = discord.EntityType.external
+                    await ctx.send(f"Event location will be `{location}`")
+            else:
+                location = m.content
+                entity_type = discord.EntityType.external
+                await ctx.send(f"Event location will be `{location}`")
+
+        # Event description
+        description = ""
+        await ctx.send(f"Would you like to add a description to your event?\n"
+                           f"Reply with the description for your event if yes.\n"
+                           f"Otherwise, send `no`")
+        try:
+            m = await ctx.bot.wait_for(
+                "message",
+                check=lambda m: m.channel.id == ctx.channel.id
+                and m.author.id == ctx.author.id,
+                timeout=60,
+            )
+        except asyncio.TimeoutError:
+            await ctx.send(timeoutmsg)
+            return
+        else:
+            if (resp := m.content.casefold()) == "no":
+                pass
+            elif resp:
+                description = m.content
+                await ctx.send(f"Description saved")
+            else:
+                await ctx.send(timeoutmsg)
+                return
+
+        await ctx.send("Creating Event...")
+        try:
+            async with ctx.channel.typing():
+                await asyncio.sleep(.5)
+            if not entity_type or not location:
+                await guild.create_scheduled_event(name=name, start_time=start_time, channel=event_channel, end_time=end_time, privacy_level=discord.PrivacyLevel.guild_only, description=description)
+            elif not event_channel:
+                await guild.create_scheduled_event(name=name, start_time=start_time, entity_type=entity_type, location=location, end_time=end_time, privacy_level=discord.PrivacyLevel.guild_only, description=description)
+            else:
+                await guild.create_scheduled_event(name=name, start_time=start_time, entity_type=entity_type, location=location, end_time=end_time, privacy_level=discord.PrivacyLevel.guild_only, description=description)
+        except Exception as e:
+            logger.info(e)
+            await ctx.send("Could not create scheduled event")
+
+    @event.command(name="duplicate")
+    async def duplicate_event(self, ctx, eventid: int, year: int, month: int, day: int, hour: int=None, minute: int=None):
+        """
+        Creates a new scheduled event
+        `<name>` The name of the event
+        `<year>` Year of duplicate event start
+        `<month>` Month of duplicate event start
+        `<day>` Day of duplicate event start
+        `[hour]` Hour of duplicate event start
+        `[minute]` Minute of duplicate event start
+        """
+        guild = ctx.guild
+        try:
+            guild.get_scheduled_event(eventid)
+        except:
+            ctx.send(f"Could not find event with ID `{eventid}`")
+            return
+
+        event = guild.get_scheduled_event(eventid)
+        global eventstart
+        eventstart = event.start_time.astimezone()
+
+        if not hour:
+            hour = eventstart.hour
+        if not minute:
+            minute = eventstart.minute
+
+        eventstart = eventstart.replace(year=year, month=month, day=day, hour=hour, minute=minute)
+
+        # Event time check
+        timeoutmsg = f"I won't wait forever for a response."
+        try:
+            # If OS is MacOS
+            await ctx.send(f"Is `{eventstart.strftime('%B %-d %Y at %-I:%M %p')} the correct start time for your event?`")
+        except ValueError:
+            # If OS is Windows
+            await ctx.send(f"Is `{eventstart.strftime('%B %#d %Y at %#I:%M %p')} the correct start time for your event?`")
+        if eventstart:
+            try:
+                m = await ctx.bot.wait_for(
+                    "message",
+                    check=lambda m: m.channel.id == ctx.channel.id
+                    and m.author.id == ctx.author.id,
+                    timeout=30,
+                )
+            except asyncio.TimeoutError:
+                await ctx.send(timeoutmsg)
+                return
+            else:
+                if (resp := m.content.casefold()) == "no":
+                    await ctx.send("When will your event start?\n"
+                                   "Response should be space-separated list using numbers for year, month, day. Time should be in 24-hour format.\n"
+                                   "`Example: 2023 1 1 13 30`\n"
+                                   "`Returns: January 1, 2023 at 1:30 PM EST`"
+                                   )
+                    try:
+                        m = await ctx.bot.wait_for(
+                            "message",
+                            check=lambda m: m.channel.id == ctx.channel.id
+                                            and m.author.id == ctx.author.id,
+                            timeout=30,
+                        )
+                    except asyncio.TimeoutError:
+                        await ctx.send(timeoutmsg)
+                        return
+                    else:
+                        try:
+                            # If OS is MacOS
+                            resp = m.content
+                            eventstart = datetime.strptime(resp, '%Y %m %d %H %M')
+                            eventstart = eventstart.astimezone()
+                            await ctx.send(f"Event start will be `{eventstart.strftime('%B %-d %Y at %-I:%M %p')}`")
+                        except ValueError:
+                            # If OS is Windows
+                            resp = m.content
+                            eventstart = datetime.strptime(resp, '%Y %m %d %H %M')
+                            eventstart = eventstart.astimezone()
+                            await ctx.send(f"Event start will be `{eventstart.strftime('%B %#d %Y at %#I:%M %p')}`")
+                        except:
+                            await ctx.send(
+                                f"Time formatting is incorrect please use `{ctx.prefix}event duplicate` and try again.")
+                            return
+                elif resp == "yes":
+                    pass
+                else:
+                    await ctx.send(timeoutmsg)
+                    return
+
+        eventend = event.end_time.astimezone() + (eventstart - event.start_time.astimezone())
+        name = event.name
+        description = event.description
+        channel = event.channel
+        privacy_level = discord.PrivacyLevel.guild_only
+        entity_type = event.entity_type
+        global image
+        if event.cover_image:
+            image = await event.cover_image.read()
+        else:
+            image = event.cover_image
+        location = event.location
+
+        await ctx.send("Creating Event...")
+        try:
+            async with ctx.channel.typing():
+                await asyncio.sleep(.5)
+            # With image
+            if image and (not entity_type or not location):
+                await guild.create_scheduled_event(name=name, start_time=eventstart, privacy_level=privacy_level, channel=channel, end_time=eventend, description=description, image=image)
+            elif image and not channel:
+                await guild.create_scheduled_event(name=name, start_time=eventstart, entity_type=entity_type, privacy_level=privacy_level, location=location, end_time=eventend, description=description, image=image)
+            # Without image
+            elif not image and (not entity_type or not location):
+                await guild.create_scheduled_event(name=name, start_time=eventstart, privacy_level=privacy_level, channel=channel, end_time=eventend, description=description)
+            else:
+                await guild.create_scheduled_event(name=name, start_time=eventstart, entity_type=entity_type, privacy_level=privacy_level, location=location, end_time=eventend, description=description)
+        except Exception as e:
+            logger.info(e)
+            await ctx.send("Could not create scheduled event")
 
     @commands.Cog.listener()
     async def on_scheduled_event_create(self, ctx):
@@ -934,6 +1273,7 @@ class Rehoboam(commands.Cog):
             except:
                 logger.info("Could not save events JSON")
 
+    # Rocketry Server Only
     @tasks.loop(seconds=15)
     async def check_slcf_stock(self):
         """Task to check if SLCF is in stock.  Active while SLCF is OUT of stock, sending a message once it becomes IN
@@ -1073,61 +1413,61 @@ async def googlesheetsfetch(self, ctx, mixEmail):
         if g_id is None:
             await self.config.guild(ctx.guild).guild_id.set(ctx.guild.id)
 
-        admin_id = await self.config.guild(ctx.guild).admin_channel()
-        adminchannel = ctx.guild.get_channel(admin_id)
+        mod_id = await self.config.guild(ctx.guild).mod_channel()
+        modchannel = ctx.guild.get_channel(mod_id)
 
         if dues_json is None:
-            await adminchannel.send("""
+            await modchannel.send("""
             `Google Sheets JSON is not set. Use '[p]sheetsconfig serverjson' command to set the file location.`
             """)
             return
         if sheet_name is None:
-            await adminchannel.send("""
+            await modchannel.send("""
             `Google Sheets sheet name is not set. Use '[p]sheetsconfig sh' to set the sheet name.`
             """)
             return
         if worksheet_name is None:
-            await adminchannel.send("""
+            await modchannel.send("""
             `Google Sheets worksheet name is not set. Use '[p]sheetsconfig wks' to set the sheet name`
             """)
             return
         if dues_range_open is None:
-            await adminchannel.send("""
+            await modchannel.send("""
             `Google Sheets dues cell range has no left bound. Use '[p]sheetsconfig duesrange' to set the bounds.`
             """)
             return
         if dues_range_close is None:
-            await adminchannel.send("""
+            await modchannel.send("""
             `Google Sheets dues cell range has no right bound. Use '[p]sheetsconfig duessrange' to set the bounds.`
             """)
             return
         if emails_range_open is None:
-            await adminchannel.send("""
+            await modchannel.send("""
             `Google Sheets emails cell range has no left bound. Use '[p]sheetsconfig emailsrange' to set the bounds.`
             """)
             return
         if emails_range_close is None:
-            await adminchannel.send("""
+            await modchannel.send("""
             `Google Sheets emails cell range has no right bound. Use '[p]sheetsconfig emailsrange' to set the bounds.`
             """)
             return
         if alum_range_open is None:
-            await adminchannel.send("""
+            await modchannel.send("""
             `Google Sheets alum cell range has no left bound. Use '[p]sheetsconfig alumrange' to set the bounds.`
             """)
             return
         if alum_range_close is None:
-            await adminchannel.send("""
+            await modchannel.send("""
             `Google Sheets alum cell range has no right bound. Use '[p]sheetsconfig alumrange' to set the bounds.`
             """)
             return
         if ver_range_open is None:
-            await adminchannel.send("""
+            await modchannel.send("""
             `Google Sheets verified cell range has no left bound. Use '[p]sheetsconfig verrange' to set the bounds.`
             """)
             return
         if ver_range_close is None:
-            await adminchannel.send("""
+            await modchannel.send("""
             `Google Sheets verified cell range has no right bound. Use '[p]sheetsconfig verrange' to set the bounds.`
             """)
             return
@@ -1180,14 +1520,14 @@ async def googlesheetsfetch(self, ctx, mixEmail):
             counter = counter + 1
             try:
                 # If OS is MacOS
-                await adminchannel.send(
+                await modchannel.send(
                     time.strftime(f"""
                     `Sheets data successfully retrieved at %-I:%M:%S %p.\nFetch {counter}\n`
                     """)
                 )
             except ValueError:
                 # If OS is Windows
-                await adminchannel.send(
+                await modchannel.send(
                     time.strftime(f"""
                     `Sheets data successfully retrieved at %#I:%M:%S %p.\nFetch {counter}\n`
                     """)
@@ -1235,7 +1575,7 @@ async def googlesheetswrite(self, ctx, code: int, nickname = None, username_disc
         }],
             value_input_option='USER_ENTERED')
     else:
-        ctx.send(f'Error in function `googlesheetswrite`\nInvalid code. Code is `code`')
+        ctx.send(f'Error in function `googlesheetswrite`\nInvalid code. Code is `{code}`')
         return
 
 async def clearindex(self,ctx):

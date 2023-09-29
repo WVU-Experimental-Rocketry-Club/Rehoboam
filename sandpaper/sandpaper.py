@@ -9,8 +9,8 @@ from redbot.core import checks, commands, Config
 from redbot.core.utils.chat_formatting import text_to_file
 from typing import Union
 
-class Scarlet(commands.Cog):
-    """Scarlet bot stuff idk"""
+class Sandpaper(commands.Cog):
+    """Sandpaper bot stuff idk"""
 
     async def red_delete_data_for_user(self, **kwargs):
         """ Nothing to delete """
@@ -102,7 +102,6 @@ class Scarlet(commands.Cog):
 
     @commands.group(autohelp=True)
     @commands.guild_only()
-    @checks.admin_or_permissions(administrator=True)
     async def wlist(self, ctx):
         """Commands for interacting with the whitelist"""
         pass
@@ -190,7 +189,6 @@ class Scarlet(commands.Cog):
 
     @commands.group(autohelp=True)
     @commands.guild_only()
-    @checks.admin_or_permissions(administrator=True)
     async def blist(self, ctx):
         """Commands for interacting with the blacklist"""
         pass
